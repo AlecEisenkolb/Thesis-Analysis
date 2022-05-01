@@ -11,7 +11,7 @@ PATH <- "Raw Data/"
 ##### ------------------ import election results dataset ----------------- #####
 # path and import
 DTA_Elec <- "btw21 ergebniss/BWL_Endgültig.csv"
-election_df <- read.csv(paste0(PATH, DTA_Elec), sep = ";", skip = 9, header = TRUE, dec = ",")
+election_df <- read_csv(paste0(PATH, DTA_Elec), sep = ";", skip = 9, header = TRUE, dec = ",")
 
 # clean data
 election_df <- election_df %>%
@@ -45,7 +45,7 @@ sapply(election_df, class)
 ##### --------------------- import candidacy dataset --------------------- #####
 # path and import
 DTA_Cand <- "btw21_kandidaturen_utf8.csv"
-candidate_df <- read.csv(paste0(PATH, DTA_Cand), sep = ";", skip = 8, header = TRUE, dec = ",")
+candidate_df <- read_csv(paste0(PATH, DTA_Cand), sep = ";", skip = 8, header = TRUE, dec = ",")
 
 # clean data
 candidate_df <- candidate_df %>%
@@ -89,7 +89,7 @@ sapply(candidate_df, class)
 ##### --------------------- import structural dataset -------------------- #####
 # path and import
 DTA_Struc <- "btw21_strukturdaten.csv"
-structural_df <- read.csv(paste0(PATH, DTA_Struc), sep = ";", skip = 8, header = TRUE) %>%
+structural_df <- read_csv(paste0(PATH, DTA_Struc), sep = ";", skip = 8, header = TRUE) %>%
   select(-`Fußnoten`)
 
 # check classes - numerics are in character mode as German thousand and decimal separator is different
@@ -159,7 +159,7 @@ sapply(structural_df, class)
 ##### --------------------- import twitter ID dataset -------------------- #####
 # path and import
 DTA_twitter <- "Twitter IDs/twitter_ids.csv"
-twitterid_df <- read.csv(paste0(PATH, DTA_twitter), sep = ";", header = TRUE)
+twitterid_df <- read_csv(paste0(PATH, DTA_twitter), sep = ";", header = TRUE)
 
 # clean data
 twitterid_df <- twitterid_df %>%
@@ -235,6 +235,9 @@ master_df <- master_df %>%
          state = state.y,
          district = district.y)
 
+# Save data as CSV file
+write_csv(master_df, "Clean Data/master_nontwitter.csv")
+
 ### Election dataset has few less observations that candidacy dataset, as election data
 ### combines smaller parties into a category of "others", thus removing the results of
 ### direct candidates of much smaller parties, which are still listed in the candidacy
@@ -256,6 +259,9 @@ twitter_ID2 <- master_df %>%
 # Create final dataframe with all twitter IDs and screen names (duplicated names as candidates sometimes have multiple accounts - but we scrape all)
 twitter_api <- twitter_ID1 %>%
   rbind(twitter_ID2)
+
+# Save data as CSV file for use in Twitter API in Python
+write_csv(twitter_api, "Clean Data/Twitter/twitter_ids.csv")
 
 ### We have 1201 candidates from the core parties that are simultaneously direct candidates in a district and also have
 ### a twitter ID. In total we have 1215 twitter IDs which we will proceed to scrape using the Twitter API. 

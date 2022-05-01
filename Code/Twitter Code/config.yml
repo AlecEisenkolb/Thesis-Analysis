@@ -1,0 +1,11 @@
+# YAML config file to store Twitter API authentication data
+# Author: Alec Eisenkolb
+# Date: 01.05.2022
+
+user_authentication:
+  API_Key: kg74YtmvPv13kM7JFlcN9e7gY
+  API_Key_Secret: paf6bsrwsyQHotulld8WZE4Rkff07PQd7XlE8IRtwwrfHaLXmT
+  Bearer_Token: AAAAAAAAAAAAAAAAAAAAAG0uagEAAAAAf4GsrUcR1H5b6e1W87JvAfwIoDA%3D0UhKNuJJfZml5b1EwE5t6WAVrh6S48472t2BejlsIXYTnN06U5
+  Access_Token: 1503365848773410821-Gg9nJfiencAEWCd6dLkItA8w72Vj42
+  Access_Token_Secret: 1GoWg6gOHREszv7fryl3O0O71pDO3SESz8pqW1RlgK4AV
+
