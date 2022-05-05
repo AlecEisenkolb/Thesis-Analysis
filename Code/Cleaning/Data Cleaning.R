@@ -11,7 +11,7 @@ PATH <- "Raw Data/"
 ##### ------------------ import election results dataset ----------------- #####
 # path and import
 DTA_Elec <- "btw21 ergebniss/BWL_Endgültig.csv"
-election_df <- read_csv(paste0(PATH, DTA_Elec), sep = ";", skip = 9, header = TRUE, dec = ",")
+election_df <- read.csv(paste0(PATH, DTA_Elec), sep = ";", skip = 9, header = TRUE, dec = ",")
 
 # clean data
 election_df <- election_df %>%
@@ -45,7 +45,7 @@ sapply(election_df, class)
 ##### --------------------- import candidacy dataset --------------------- #####
 # path and import
 DTA_Cand <- "btw21_kandidaturen_utf8.csv"
-candidate_df <- read_csv(paste0(PATH, DTA_Cand), sep = ";", skip = 8, header = TRUE, dec = ",")
+candidate_df <- read.csv(paste0(PATH, DTA_Cand), sep = ";", skip = 8, header = TRUE, dec = ",")
 
 # clean data
 candidate_df <- candidate_df %>%
@@ -89,7 +89,7 @@ sapply(candidate_df, class)
 ##### --------------------- import structural dataset -------------------- #####
 # path and import
 DTA_Struc <- "btw21_strukturdaten.csv"
-structural_df <- read_csv(paste0(PATH, DTA_Struc), sep = ";", skip = 8, header = TRUE) %>%
+structural_df <- read.csv(paste0(PATH, DTA_Struc), sep = ";", skip = 8, header = TRUE) %>%
   select(-`Fußnoten`)
 
 # check classes - numerics are in character mode as German thousand and decimal separator is different
@@ -159,7 +159,8 @@ sapply(structural_df, class)
 ##### --------------------- import twitter ID dataset -------------------- #####
 # path and import
 DTA_twitter <- "Twitter IDs/twitter_ids.csv"
-twitterid_df <- read_csv(paste0(PATH, DTA_twitter), sep = ";", header = TRUE)
+twitterid_df <- read.csv(paste0(PATH, DTA_twitter), sep = ";", header = TRUE, 
+                         colClasses = c(rep("character", 12), rep("integer", 5), rep("character", 5)))
 
 # clean data
 twitterid_df <- twitterid_df %>%
@@ -172,9 +173,10 @@ twitterid_df <- twitterid_df %>%
   rename(district_num = district_number) # change name of variable to match other datasets
 
 ##### --------------------------- merge datasets ------------------------- #####
-# merge
+# merge & filter for candidates that are a direct candidate in an election district 
+### AND have a twitter ID that we can scrape (relevant for analysis)
 master_df <- twitterid_df %>%
-  filter(isDC == 1 & !is.na(user_id1)) %>% # filter for candidates that are a direct candidate in an election district AND have a twitter ID that we can scrape (relevant for analysis)
+  filter(isDC == 1 & user_id1 != "") %>% 
   left_join(election_df, by = c("district_num", "party")) %>%
   left_join(candidate_df, by = c("district_num", "party")) %>%
   left_join(structural_df, by = "district_num")
@@ -189,8 +191,9 @@ check %>%
   filter(!(lastname.x == lastname.y) | !(firstname.x == firstname.y)) %>%
   view()
 
-### The inspection above showed that both the variables lastname.x and firstname.x cannot show the German "umlaute" correctly, 
-### hence we delete these variables and solely keep lastname.y and firstname.y. 
+### The inspection above showed that both the variables lastname.x and firstname.x 
+### cannot show the German "umlaute" correctly, hence we delete these variables 
+### and solely keep lastname.y and firstname.y. 
 
 # Check variable incumbent
 check %>%
@@ -252,19 +255,21 @@ twitter_ID1 <- master_df %>%
 
 twitter_ID2 <- master_df %>%
   select(lastname, firstname, screen_name2, user_id2) %>%
-  drop_na() %>%
+  filter(user_id2 != "") %>% # remove all "NA" values, encoded as empty strings 
   rename(screenname = screen_name2, 
          user_id = user_id2)
 
-# Create final dataframe with all twitter IDs and screen names (duplicated names as candidates sometimes have multiple accounts - but we scrape all)
+# Create final dataframe with all twitter IDs and screen names (duplicated names 
+# as candidates sometimes have multiple accounts - but we scrape all)
 twitter_api <- twitter_ID1 %>%
   rbind(twitter_ID2)
 
 # Save data as CSV file for use in Twitter API in Python
 write_csv(twitter_api, "Clean Data/Twitter/twitter_ids.csv")
 
-### We have 1201 candidates from the core parties that are simultaneously direct candidates in a district and also have
-### a twitter ID. In total we have 1215 twitter IDs which we will proceed to scrape using the Twitter API. 
+### We have 1201 candidates from the core parties that are simultaneously direct 
+### candidates in a district and also have a twitter ID. In total we have 1215 
+### twitter IDs which we will proceed to scrape using the Twitter API. 
 
 
 
