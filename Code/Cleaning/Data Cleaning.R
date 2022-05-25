@@ -1,5 +1,5 @@
 # Non-Twitter data preparation
-# Date: 22.04.2022
+# Date: 10.05.2022
 # Author: Alec Eisenkolb
 
 # import libraries
@@ -9,6 +9,12 @@ library(tidyverse)
 PATH <- "Raw Data/"
 
 ##### ------------------ import election results dataset ----------------- #####
+### This dataset includes information on the district election results for 2021
+### and 2017 federal elections, including percent and absolute votes for 
+### Erststimme (direct candidates) and Zweitstimme (party vote) per district. 
+
+### Citation:
+
 # path and import
 DTA_Elec <- "btw21 ergebniss/BWL_Endgültig.csv"
 election_df <- read.csv(paste0(PATH, DTA_Elec), sep = ";", skip = 9, header = TRUE, dec = ",")
@@ -43,6 +49,11 @@ election_df %>%
 sapply(election_df, class)
 
 ##### --------------------- import candidacy dataset --------------------- #####
+### This dataset includes information on all political candidates for the 
+### German parliament in Germany's 2021 federal election.
+
+### Citation: 
+
 # path and import
 DTA_Cand <- "btw21_kandidaturen_utf8.csv"
 candidate_df <- read.csv(paste0(PATH, DTA_Cand), sep = ";", skip = 8, header = TRUE, dec = ",")
@@ -87,6 +98,10 @@ candidate_df %>%
 sapply(candidate_df, class) 
 
 ##### --------------------- import structural dataset -------------------- #####
+### This dataset includes all structural data per political district.
+
+### Citation: 
+
 # path and import
 DTA_Struc <- "btw21_strukturdaten.csv"
 structural_df <- read.csv(paste0(PATH, DTA_Struc), sep = ";", skip = 8, header = TRUE) %>%
@@ -157,6 +172,11 @@ structural_df <- structural_df %>%
 sapply(structural_df, class)
 
 ##### --------------------- import twitter ID dataset -------------------- #####
+### This data contains a list of all twitter accounts with their respective IDs
+### alongside other variables and demographics
+
+### Citation: 
+
 # path and import
 DTA_twitter <- "Twitter IDs/twitter_ids.csv"
 twitterid_df <- read.csv(paste0(PATH, DTA_twitter), sep = ";", header = TRUE, 
@@ -270,8 +290,6 @@ write_csv(twitter_api, "Clean Data/Twitter/twitter_ids.csv")
 ### We have 1201 candidates from the core parties that are simultaneously direct 
 ### candidates in a district and also have a twitter ID. In total we have 1215 
 ### twitter IDs which we will proceed to scrape using the Twitter API. 
-
-
 
 
 
