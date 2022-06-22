@@ -11,7 +11,7 @@ import os
 import time
 
 # Define variable "TASK", which determines the functions of the script that will be executed.
-# This will allow the script to selectively scrape certain tweets/retweets/replies and not the entire frame.
+# This will allow the script to selectively scrape certain tweets/retweets/replies (i.e. execute only selected functions).
 # Select from: 
 # "Testing" = used to test certain parts of script (debugging)
 # "Scrape Tweets" = scrapes tweets of all political candidates between specified time period (time: 1 hr)
@@ -285,6 +285,7 @@ if __name__ == "__main__":
     access_token_secret = config["user_authentication"]["Access_Token_Secret"]
 
 # # # # # Twitter API: web scraping tweets from user IDs # # # # #
+# for this to work, user must have previously run the code "01 Data Cleaning.R"
 
     if (TASK == "Scrape Tweets" or TASK == "ALL"):
         # import twitter IDs dataset
@@ -327,6 +328,7 @@ if __name__ == "__main__":
         df_tweetcheck.to_csv(f"{EXPORT_PATH}/tweet_check.csv")
 
 # # # # # Twitter API: get full tweet text of parent tweets in cases of Re-Tweets # # # # #
+# for this function to work, user must have previously run the code "03 Twitter Cleaning.R"
 
     if (TASK == "Scrape Retweets" or TASK == "ALL"):
         # re-tweets are often concated at a certain length, hence we use the parent IDs of each re-tweet to get the full text of the original tweet
@@ -348,6 +350,7 @@ if __name__ == "__main__":
         df_retweets.to_csv(f"{EXPORT_PATH}/retweets.csv")
 
 # # # # # Step 4: run algorithm to get replies of all tweets # # # # #
+# for this function to work, user must have previously run the code "03 Twitter Cleaning.R"
 
     if (TASK == "Scrape Replies" or TASK == "ALL"):
         # get list of Tweet IDs (conversation IDs) for which there exist replies

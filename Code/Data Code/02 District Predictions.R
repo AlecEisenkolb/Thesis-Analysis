@@ -1,5 +1,5 @@
-# District Predictions
-# Date: 11.05.2022
+# District Predictions 100 days prior to election
+# Date: 16.06.2022
 # Author: Alec Eisenkolb
 
 ### Data and some code taken from following source: 
@@ -18,6 +18,12 @@ PATH <- "Raw Data/"
 # path and import
 dist_pred <- readRDS(paste0(PATH, "Wkr Forecast/2021_wkr.RDS"))
 
+# create empty dataframe to store results in
+forecast <- as.data.frame(matrix(NA, 
+                                 nrow = 299,
+                                 ncol = 7))
+colnames(forecast) <- c("district_num", "SPD", "CDUCSU", "GRUENE", "FDP", "LINKE", "AFD")
+
 ### the following code (next 10 lines of code) has been written by the research  
 ### team to process the RDS file and compute predictions
 nsim <- nrow(forecast)
@@ -30,12 +36,6 @@ dist_pred <- matrix(unlist(lapply(dist_pred, "[[", "winner_nn")),
 # compute winning probabilities for parties in each election district
 dist_pred <- apply(dist_pred, 2, function(x)
   - sort(-table(x) / nrow(dist_pred)))
-
-# create empty dataframe to store results in
-forecast <- as.data.frame(matrix(NA, 
-                                 nrow = 299,
-                                 ncol = 7))
-colnames(forecast) <- c("district_num", "SPD", "CDUCSU", "GRUENE", "FDP", "LINKE", "AFD")
 
 # define list of parties 
 parties <- c("SPD", "CDU", "GRUENE", "FDP", "LINKE", "AFD")
@@ -75,7 +75,35 @@ for (i in 1:299){
   }
 }
 
+# pivot longer for easier merging with candidates dataset
+forecast <- forecast %>%
+  pivot_longer(!district_num, names_to = "party", values_to = "Prediction")
 
+# rename entries for Parties in forecast table to match master dataframe
+# change encoding of "CDUCSU" to CSU for bavarian districts, source: https://www.bundeswahlleiter.de/bundestagswahlen/2021/wahlkreiseinteilung/bund-99/land-9.html
+forecast <- forecast %>%
+  mutate(party = if_else(party == "AFD", "AfD", party),
+         party = if_else(party == "GRUENE", "GRÜNE", party),
+         party = if_else(party == "LINKE", "DIE LINKE", party),
+         party = if_else(party == "CDUCSU" & (district_num >= 212 & district_num <= 257), "CSU", party), # select only bavarian districts and change encoding to CSU
+         party = if_else(party == "CDUCSU" & !(district_num >= 212 & district_num <= 257), "CDU", party)) # the non-bavarian districts are encoded as CDU
 
+# import master_nontwitter.csv to merge the district forecast with remaining data
+master_df <- read_csv("Clean Data/master_nontwitter.csv")
 
+# check party encodings are the same for both datasets
+unique(forecast$party)
+unique(master_df$party)
 
+# merge data with district-level prediction
+master_df <- master_df %>%
+  left_join(forecast, by = c("district_num", "party"))
+
+# count NA entries for "prediction" variable in master dataframe which we just added
+colSums(is.na(master_df)) 
+
+# write master dataset
+write_csv(master_df, "Clean Data/master_nontwitter.csv")
+
+# clean memory
+rm(master_df, firecast, parties, dist_pred)

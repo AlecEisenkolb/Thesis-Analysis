@@ -62,7 +62,7 @@ candidate_df <- read.csv(paste0(PATH, DTA_Cand), sep = ";", skip = 8, header = T
 candidate_df <- candidate_df %>%
   filter(Gebietsart == "Wahlkreis") %>% # filter for candidates directly electable only
   mutate(Gebietsnummer = str_pad(Gebietsnummer, 3, side = "left", pad = "0")) %>% # standardize notation for Wahlkreis numbers
-  mutate(Geschlecht = if_else(Geschlecht == "m", 1, 0), # change encoding of gender variable
+  mutate(Geschlecht = if_else(Geschlecht == "m", 1, 0), # change encoding of gender variable (Male == 1)
          VorpGewaehlt = if_else(VorpGewaehlt == "X", 1, 0)) %>% # change encoding of incumbent variable
   select(Nachname, Vornamen, Geschlecht, Geburtsjahr, Geburtsort, PLZ, Wohnort, 
          WohnortLandAbk, Staatsangehörigkeit, Beruf, Berufsschluessel, Gebietsnummer, 
@@ -246,7 +246,7 @@ structural_df %>%
 
 ### The two districts which seem to have an inconsistency are districts 136 and 137. Further google searches led to the results,
 ### that the official website from the "Bundeswahlleiter" (https://www.bundeswahlleiter.de/bundestagswahlen/2021/wahlkreiseinteilung/bund-99/land-5/wahlkreis-136.html) 
-### defines the election districts according to the variable district.y. Hence we will keep this variable as it follows the official district organisation.
+### defines the election districts according to the variable "district.y". Hence we will keep this variable as it follows the official district organisation.
 
 # Remove and rename the above variables from the master dataset
 master_df <- master_df %>%
@@ -267,7 +267,7 @@ write_csv(master_df, "Clean Data/master_nontwitter.csv")
 ### dataset. Twitter ID dataset only includes candidates of largest parties: SPD, CDU, 
 ### FDP, GRÜNE, DIE LINKE and AfD. 
 
-# Prepare a seperate dataset for Twitter scraping
+# # # # # Prepare a seperate dataset for Twitter scraping # # # # #
 twitter_ID1 <- master_df %>%
   select(lastname, firstname, screen_name1, user_id1) %>%
   rename(screenname = screen_name1,
