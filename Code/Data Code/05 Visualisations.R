@@ -10,6 +10,7 @@
 # install libraries, uncomment below if necessary
 # install.packages("devtools")
 # devtools::install_github("cttobin/ggthemr")
+# install.packages("maptools") # required for spatial visual analysis
 
 # load libraries
 library(tidyverse)
@@ -36,7 +37,6 @@ graph_theme <- define_palette(
 )
 
 # define second colour scheme (used for line graphs for better contrast between groups)
-#colourful_palette <- c("#5B7444", "#A3C586", "#47697E", "#688B9A", "#FFCC33", "#FEEB75")
 colourful_palette <- c("#658354", "#b3cf99", "#47697E", "#688B9A", "#FFCC33", "#FEEB75")
 colourful_palette <- c("#555555", colourful_palette)
 theme2 <- define_palette(
@@ -45,13 +45,36 @@ theme2 <- define_palette(
   background = '#ffffff'
 )
 
+# define third colour scheme (used to match colour of official party colour)
+party_col <- c("#0000FF", "#a9a9a9", "#000000", "#FF00FF", "#F5FF00", "#35682d", "#ff0000")
+party_col <- c("#555555", party_col)
+party_pal <- define_palette(
+  swatch = party_col,
+  gradient = c(lower = party_col[1L], upper = party_col[2L]),
+  background = '#ffffff'
+)
+
 # set new theme as default
 ggthemr(graph_theme, layout = "clean", spacing = 1)
 
-# import master and twitter dataframe
+# define ggplot2 theme for maps (excluding axes and titles)
+map_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+)
+
+# import master, twitter dataframes and shapefiles
 df_master <- read_csv("Clean Data/master.csv")
 df_twitter <- read_csv("Clean Data/Twitter/twitter_clean.csv", col_types = "ccTccddddcccD")
 df_userids <- read_csv("Clean Data/Twitter/twitter_ids.csv", col_types = "cccc")
+
+df_shp <- read_csv("Clean Data/District_shapefiles.csv") %>%
+  mutate(WKR_NR = str_pad(WKR_NR, 3, side = "left", pad = "0")) %>%
+  rename(district_num = WKR_NR)
 
 # # # # # Graph 1: Gender distribution of candidates w Twitter Acc. # # # # #
 
@@ -131,15 +154,45 @@ df_master %>%
 
 # # # # # Graph 4: Geo-data of candidates # # # # #
 
-# (22.06.2022)
+# number of candidates per district
+df_shp %>%
+  left_join((df_master %>%
+               group_by(district_num) %>%
+               summarise(count = n())), by = "district_num") %>%
+  mutate(count = if_else(is.na(count), 0, as.numeric(count))) %>%
+  ggplot(aes(x = long, y = lat)) +
+  geom_polygon(aes(fill = count, group = group), colour="#000000") +
+  coord_fixed(1.4) +
+  map_axes +
+  scale_fill_gradientn(colors=rev(c("#658354", "#b3cf99", "#47697E", "#688B9A", "#FFCC33", "#FEEB75")),
+                      breaks=c(1, 2, 3, 4, 5, 6)) +
+  labs(fill="Candidates")
 
 # # # # # Graph 5: Geo-data of votes # # # # #
+# set map theme
+ggthemr_reset()
+ggthemr(party_pal, layout = "clean", spacing = 1)
+# Direct vote (1st vote)
+df_shp %>%
+  left_join((df_master %>%
+               group_by(district_num, party) %>%
+               summarise(value = max(percent_1),
+                         party=party) %>%
+               ungroup() %>%
+               group_by(district_num) %>%
+               filter(value==max(value))),
+            by = "district_num") %>%
+  ggplot(aes(x = long, y = lat)) +
+  geom_polygon(aes(fill = party, group = group), colour = "#000000") +
+  coord_fixed(1.4) +
+  map_axes +
+  labs(fill="Party")
 
-# (22.06.2022)
+
 
 # # # # # Graph: Geo-data of control variables per district # # # # #
 
-# (22.06.2022)
+# (23.06.2022)
 
 # # # # # Graph 6: Twitter Usage (posts) # # # # #
 

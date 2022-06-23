@@ -291,5 +291,23 @@ write_csv(twitter_api, "Clean Data/Twitter/twitter_ids.csv")
 ### candidates in a district and also have a twitter ID. In total we have 1215 
 ### twitter IDs which we will proceed to scrape using the Twitter API. 
 
+# # # # # Cleaning shapefile of election districts # # # # #
+# import specific libraries for GIS data
+library(plyr)
+library(sp)
+library(rgdal)
 
+# importing shapefile
+district_shp <- readOGR(paste0(PATH, "Geography/btw21_district_shp/"))
 
+# save rownames as an identifier for each district
+district_shp@data$id = rownames(district_shp@data)
+
+# save polygon shapes as a normal dataframe
+shp_df <- ggplot2::fortify(district_shp)
+
+# combine the polygons in dataframe with district names by unique identifier
+shapefiles <- join(shp_df, district_shp@data, by="id")
+
+# save data
+write_csv(shapefiles, "Clean Data/District_shapefiles.csv")
