@@ -172,18 +172,18 @@ df_tweet_info <- df_tweet_info %>%
 df_tweet_info <- df_tweet_info %>%
   left_join(User_Tweet_Info, by = c("firstname", "lastname"))
 
-### merge with main candidates dataframe
+### merge with main candidates dataframe (master_all_cand)
 # import master candidates dataframe
-df_master <- read_csv(paste0(IMPORT_PATH, "master_nontwitter.csv"))
+df_master <- read_csv(paste0(IMPORT_PATH, "master_all_cand.csv"))
 
 df_master <- df_master %>%
   left_join(df_tweet_info, by = c("firstname", "lastname"))
 
 # save master dataframe
-write.csv(df_master, "Clean Data/master.csv", row.names = FALSE)
+write.csv(df_master, "Clean Data/master_all_cand.csv", row.names = FALSE)
 
 # export df_tweets as CSV for further API progress
 write.csv(df_tweets, paste0(EXPORT_PATH, "twitter_clean.csv"), row.names = FALSE)
 
 # clean memory
-rm(df_tweet_info, df_user_ids, User_Tweet_Info, df_tweets, df_master)
+rm(df_tweet_info, df_user_ids, User_Tweet_Info, df_tweets, df_master, lang)

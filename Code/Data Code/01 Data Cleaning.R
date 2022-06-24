@@ -1,5 +1,5 @@
 # Non-Twitter data preparation
-# Date: 10.05.2022
+# Date: 23.06.2022
 # Author: Alec Eisenkolb
 
 # import libraries
@@ -85,7 +85,9 @@ candidate_df <- candidate_df %>%
          list_district = VerknGebietsname,
          list_party = VerknGruppenname,
          list_spot = VerknListenplatz,
-         incumbent = VorpGewaehlt) # rename variables into English
+         incumbent = VorpGewaehlt) %>% # rename variables into English
+  filter(party=="AfD" | party=="CDU" | party=="CSU" | party=="DIE LINKE" | 
+           party=="FDP" | party=="GRÜNE" | party=="SPD") # filter for the major parties, as we only have twitter accounts from those parties
 
 # check whether there is one candidate per district and party (for uniqueness to merge)
 candidate_df %>%
@@ -190,16 +192,17 @@ twitterid_df <- twitterid_df %>%
   mutate(gender = if_else(gender == "m", 1, 0),
          district_number = str_pad(district_number, 3, side = "left", pad = "0"),
          party = if_else(party == "GR\xdcNE", "GRÜNE", party)) %>% # change encoding of gender, district_num and party variable
-  rename(district_num = district_number) # change name of variable to match other datasets
+  rename(district_num = district_number) %>% # change name of variable to match other datasets
+  mutate(Twitter_Acc = if_else(user_id1!="", 1, 0)) %>% # add variable indicating candidates that have a Twitter account
+  filter(isDC == 1) # filter for direct candidates only
 
 ##### --------------------------- merge datasets ------------------------- #####
 # merge & filter for candidates that are a direct candidate in an election district 
-### AND have a twitter ID that we can scrape (relevant for analysis)
-master_df <- twitterid_df %>%
-  filter(isDC == 1 & user_id1 != "") %>% 
+master_df <- candidate_df %>%
+  left_join(twitterid_df, by = c("district_num", "party")) %>%
   left_join(election_df, by = c("district_num", "party")) %>%
-  left_join(candidate_df, by = c("district_num", "party")) %>%
-  left_join(structural_df, by = "district_num")
+  left_join(structural_df, by = "district_num") %>%
+  mutate(Twitter_Acc = if_else(is.na(Twitter_Acc), 0, as.numeric(Twitter_Acc)))
 
 # Check master dataset whether duplicate variables are identical (additional check whether data is correctly merged)
 check <- master_df %>% 
@@ -211,9 +214,9 @@ check %>%
   filter(!(lastname.x == lastname.y) | !(firstname.x == firstname.y)) %>%
   view()
 
-### The inspection above showed that both the variables lastname.x and firstname.x 
+### The inspection above showed that both the variables lastname.y and firstname.y 
 ### cannot show the German "umlaute" correctly, hence we delete these variables 
-### and solely keep lastname.y and firstname.y. 
+### and solely keep lastname.x and firstname.x. 
 
 # Check variable incumbent
 check %>%
@@ -250,16 +253,54 @@ structural_df %>%
 
 # Remove and rename the above variables from the master dataset
 master_df <- master_df %>%
-  select(-`firstname.x`, -`lastname.x`, -`incumbent.x`, -`district.x`) %>%
-  rename(firstname = firstname.y,
-         lastname = lastname.y, 
+  select(-`firstname.y`, -`lastname.y`, -`incumbent.x`, -`district.x`) %>%
+  rename(firstname = firstname.x,
+         lastname = lastname.x, 
          incumbent = incumbent.y,
          state_short = state.x,
          state = state.y,
          district = district.y)
 
-# Save data as CSV file
-write_csv(master_df, "Clean Data/master_nontwitter.csv")
+# Check for candidates with missing information
+check <- master_df %>%
+  filter(is.na(gender) | is.na(birth_year) | is.na(firstname) | is.na(state_short))
+
+### There is only one candidate which has not been perfectly matched between the
+### candidate_df dataframe and twitterid_df dataframe. Hence I will match the missing
+### information manually
+
+# Apply correction as discussed above
+master_df <- master_df %>%
+  mutate(gender = if_else((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029"), as.numeric(sex), as.numeric(gender)),
+         state_short = if_else((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029"), as.character("HB"), as.character(state_short)),
+         incumbent = if_else((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029"), as.numeric(0), as.numeric(incumbent)),
+         isListed = if_else((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029"), as.numeric(1), as.numeric(isListed)),
+         list_place = if_else(((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029")), as.numeric(1), as.numeric(list_place)),
+         isDC = if_else((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029"), as.numeric(1), as.numeric(isDC)))
+
+### All information which has been manually entered above was taken from the following sources:
+
+### Der Bundeswahlleiter. (2021, Aug 5). Bundestagswahl 2021: Bundeswahlausschuss hat über
+### Beschwerden entschieden. Der Bundeswahlleiter. https://www.bundeswahlleiter.de/info/presse/mitteilungen/bundestagswahl-2021/22_21_2bwa-entscheidung.html.
+### Accessed on: 23.06.2022.
+
+### NA (2021, Jun 26). Politiker aus Cuxhaven führt Bremer AfD in die Bundestagswahl.
+### buten un binnen. https://www.butenunbinnen.de/nachrichten/cuxhavener-afd-bundestagswahl-liste-bremen-100.html
+### Accessed on: 23.06.2022.
+
+# Check whether updates have been incorporated correctly
+check <- master_df %>%
+  filter(firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029")
+
+# Save data as CSV file - master_all_cand is the master dataframe including all direct candidates, irrespective of having a twitter account
+write_csv(master_df, "Clean Data/master_all_cand.csv")
+
+# Further filter for candidates that only have a twitter account
+master_twitter_only <- master_df %>%
+  filter(Twitter_Acc == 1)
+
+# Save data as CSV file - master_twitter_cand is master dataframe which only includes candidates with Twitter accounts
+write_csv(master_twitter_only, "Clean Data/master_twitter_cand.csv")
 
 ### Election dataset has few less observations that candidacy dataset, as election data
 ### combines smaller parties into a category of "others", thus removing the results of
@@ -268,12 +309,12 @@ write_csv(master_df, "Clean Data/master_nontwitter.csv")
 ### FDP, GRÜNE, DIE LINKE and AfD. 
 
 # # # # # Prepare a seperate dataset for Twitter scraping # # # # #
-twitter_ID1 <- master_df %>%
+twitter_ID1 <- master_twitter_only %>%
   select(lastname, firstname, screen_name1, user_id1) %>%
   rename(screenname = screen_name1,
          user_id = user_id1)
 
-twitter_ID2 <- master_df %>%
+twitter_ID2 <- master_twitter_only %>%
   select(lastname, firstname, screen_name2, user_id2) %>%
   filter(user_id2 != "") %>% # remove all "NA" values, encoded as empty strings 
   rename(screenname = screen_name2, 

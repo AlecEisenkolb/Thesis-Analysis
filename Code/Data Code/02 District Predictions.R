@@ -89,7 +89,7 @@ forecast <- forecast %>%
          party = if_else(party == "CDUCSU" & !(district_num >= 212 & district_num <= 257), "CDU", party)) # the non-bavarian districts are encoded as CDU
 
 # import master_nontwitter.csv to merge the district forecast with remaining data
-master_df <- read_csv("Clean Data/master_nontwitter.csv")
+master_df <- read_csv("Clean Data/master_all_cand.csv")
 
 # check party encodings are the same for both datasets
 unique(forecast$party)
@@ -103,7 +103,7 @@ master_df <- master_df %>%
 colSums(is.na(master_df)) 
 
 # write master dataset
-write_csv(master_df, "Clean Data/master_nontwitter.csv")
+write_csv(master_df, "Clean Data/master_all_cand.csv")
 
 # clean memory
-rm(master_df, firecast, parties, dist_pred)
+rm(master_df, forecast, parties, dist_pred)
