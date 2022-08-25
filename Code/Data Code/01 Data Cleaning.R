@@ -1,9 +1,14 @@
 # Non-Twitter data preparation
-# Date: 23.06.2022
+# Date: 22.08.2022
 # Author: Alec Eisenkolb
 
 # import libraries
+library(Hmisc)
 library(tidyverse)
+# install.packages("haven")
+library(haven)
+# install.packages("fauxnaif")
+library(fauxnaif)
 
 # set path for raw data
 PATH <- "Raw Data/"
@@ -27,8 +32,8 @@ election_df <- election_df %>%
   select(Gebietsnummer, Gebietsname, Gruppenname, Stimme, Anzahl, 
          Prozent) %>% # selecting specific variables (removing election results from past election)
   pivot_wider(names_from = Stimme, values_from = c(Anzahl, Prozent)) %>% # Create wide version of election results
-  mutate(PztPkt_diff_1to2 = as.numeric((Prozent_1 - Prozent_2))) %>% # compute outcome variable: difference of erststimme to zweitstimme per wahlkreis
-  filter(PztPkt_diff_1to2 != is.na(PztPkt_diff_1to2)) %>%
+  mutate(Pzt_diff_1to2 = as.numeric(((Prozent_1 - Prozent_2)/Prozent_2)*100)) %>% # compute outcome variable: difference of erststimme to zweitstimme per district (%-diff)
+  filter(Pzt_diff_1to2 != is.na(Pzt_diff_1to2)) %>%
   rename(district_num = Gebietsnummer,
          district = Gebietsname,
          party = Gruppenname,
@@ -36,7 +41,7 @@ election_df <- election_df %>%
          votes_2 = Anzahl_2,
          percent_1 = Prozent_1,
          percent_2 = Prozent_2,
-         pctpoint_diff_1to2 = PztPkt_diff_1to2) # rename variables into English
+         pct_diff_1to2 = Pzt_diff_1to2) # rename variables into English
 
 # check whether there is one result per Wahlkreis and party (for uniqueness to merge)
 election_df %>%
@@ -64,7 +69,7 @@ candidate_df <- candidate_df %>%
   mutate(Gebietsnummer = str_pad(Gebietsnummer, 3, side = "left", pad = "0")) %>% # standardize notation for Wahlkreis numbers
   mutate(Geschlecht = if_else(Geschlecht == "m", 1, 0), # change encoding of gender variable (Male == 1)
          VorpGewaehlt = if_else(VorpGewaehlt == "X", 1, 0)) %>% # change encoding of incumbent variable
-  select(Nachname, Vornamen, Geschlecht, Geburtsjahr, Geburtsort, PLZ, Wohnort, 
+  select(Nachname, Vornamen, Titel, Geschlecht, Geburtsjahr, Geburtsort, PLZ, Wohnort, 
          WohnortLandAbk, Staatsangehörigkeit, Beruf, Berufsschluessel, Gebietsnummer, 
          Gruppenname, GruppennameLang, VerknKennzeichen, VerknGebietsname, VerknGruppenname, 
          VerknListenplatz, VorpGewaehlt) %>% # select important variables
@@ -85,9 +90,11 @@ candidate_df <- candidate_df %>%
          list_district = VerknGebietsname,
          list_party = VerknGruppenname,
          list_spot = VerknListenplatz,
-         incumbent = VorpGewaehlt) %>% # rename variables into English
+         incumbent = VorpGewaehlt,
+         title = Titel) %>% # rename variables into English
   filter(party=="AfD" | party=="CDU" | party=="CSU" | party=="DIE LINKE" | 
-           party=="FDP" | party=="GRÜNE" | party=="SPD") # filter for the major parties, as we only have twitter accounts from those parties
+           party=="FDP" | party=="GRÜNE" | party=="SPD") %>% # filter for the major parties, as we only have twitter accounts from those parties
+  mutate(title = if_else(title=="", as.numeric(0), as.numeric(1))) # change title variable into binary dummy
 
 # check whether there is one candidate per district and party (for uniqueness to merge)
 candidate_df %>%
@@ -284,13 +291,101 @@ master_df <- master_df %>%
 ### Beschwerden entschieden. Der Bundeswahlleiter. https://www.bundeswahlleiter.de/info/presse/mitteilungen/bundestagswahl-2021/22_21_2bwa-entscheidung.html.
 ### Accessed on: 23.06.2022.
 
-### NA (2021, Jun 26). Politiker aus Cuxhaven führt Bremer AfD in die Bundestagswahl.
+### buten un binnen (2021, Jun 26). Politiker aus Cuxhaven führt Bremer AfD in die Bundestagswahl.
 ### buten un binnen. https://www.butenunbinnen.de/nachrichten/cuxhavener-afd-bundestagswahl-liste-bremen-100.html
 ### Accessed on: 23.06.2022.
 
 # Check whether updates have been incorporated correctly
 check <- master_df %>%
   filter(firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029")
+
+### Further data manipulation
+# import job category key to summarise occupation of candidates
+job_key <- read.csv(paste0(PATH, "btw21_gewaehlte_utf8/kldb2010_berufsschluessel.csv"), 
+                    sep = ";", skip = 8, header = TRUE)
+
+# select and rename relevant variables
+job_key <- job_key %>%
+  rename(job_key = Berufsbereich_Schluessel,
+         job_key_cat = Berufsbereich_Bezeichnung,
+         job_category = Berufshauptgruppe_Berufsschluessel) %>%
+  select(job_key, job_key_cat, job_category)
+
+# merge with main dataframe
+master_df <- master_df %>%
+  left_join(job_key, by = "job_category")
+
+# import dataframe for politicians who won a seat in the current election
+winner_df <- read.csv(paste0(PATH, "btw21_gewaehlte_utf8/btw21_gewaehlte-fortschreibung_utf8.csv"),
+                      sep = ";", skip = 8, header = TRUE)
+
+# clean data of winners
+winner_df <- winner_df %>%
+  filter(Gebietsart=="Wahlkreis") %>% # select only candidates that won a seat by direct vote
+  select(Nachname, Vornamen, Gebietsnummer, Prozent) %>%
+  rename(lastname = Nachname,
+         firstname = Vornamen,
+         district_num = Gebietsnummer,
+         percent_win = Prozent) %>%
+  mutate(winner = 1, # create new variable to indicate winner
+         district_num = str_pad(district_num, 3, side = "left", pad = "0")) # change encoding of district_num to match main dataframe
+
+# merge with main dataframe
+master_df <- master_df %>%
+  left_join(winner_df, by = c("firstname", "lastname", "district_num")) %>%
+  mutate(winner = if_else(is.na(winner), as.numeric(0), as.numeric(winner)))
+
+# manually encode a variable to represent the top candidates for each party
+master_df <- master_df %>%
+  mutate(Top_candidate = if_else(((lastname == "Habeck" & firstname == "Robert") | 
+                                    (lastname == "Baerbock" & firstname == "Annalena Charlotte Alma") | 
+                                    (lastname == "Scholz" & firstname == "Olaf") | 
+                                    (lastname == "Laschet" & firstname == "Armin") | 
+                                    (lastname == "Lindner" & firstname == "Christian Wolfgang") | 
+                                    (lastname == "Bartsch" & firstname == "Dietmar Gerhard") | 
+                                    (lastname == "Wißler" & firstname == "Janine Natalie") |
+                                    (lastname == "Chrupalla" & firstname == "Tino") |
+                                    (lastname == "Weidel" & firstname == "Alice Elisabeth")), 1, 0))
+
+# check for consistency of new variable 
+# only have 8 top candidates in dataframe, as "Armin Laschet" was not a direct candidate for parliament
+describe(master_df$Top_candidate)
+
+### Source for the above list of top candidates:
+### Mendelson, B. (2021, Sep. 27). Die Kanzlerkandidaten zur Bundestagswahl 2021 -
+### wer folgt auf Angela Merkel? Handelsblatt. Available at: https://www.handelsblatt.com/politik/deutschland/baerbock-laschet-scholz-die-kanzlerkandidaten-zur-bundestagswahl-2021-wer-folgt-auf-angela-merkel-/27069870.html
+### [Accessed on: 04.07.2022]. 
+
+# change NAs of "list place" variable to 99, such that we avoid deleting over 400 observations when we include this in regressions
+# inspect list_place variable first
+summary(master_df$list_place) # max is 79, hence we choose 99 to indicate that candidates have no list place
+
+master_df <- master_df %>%
+  mutate(list_place = if_else(is.na(list_place), 99, as.numeric(list_place)))
+
+# include an East-Germany dummy variable based on district location
+# East-Berlin district numbers are 076, 083, 084, 085, & 086.
+master_df <- master_df %>%
+  mutate(East_Germany = if_else((state_short == "MV" | state_short == "BB" |
+                                   state_short == "SN" | state_short == "TH" |
+                                   state_short == "ST" | district_num == "076" |
+                                   district_num == "083" | district_num == "084" |
+                                   district_num == "085" | district_num == "086"),
+                                as.numeric(1), as.numeric(0)))
+
+### Source for East-Berlin district locations taken from official site of State of Berlin:
+### NA. (2021). Wahlgebietseinteilung. Landeswahlleiterin für Berlin. Accessed at: 
+### https://www.berlin.de/wahlen/wahlen/wahlen-2021/wahlgebietseinteilung/artikel.966836.php#wahlkreiseinteilung
+### Accessed on: 05.07.2022.
+
+summary(master_df$East_Germany)
+
+# check correct encoding of "isListed" variable
+sum(is.na(master_df$list_party))
+sum(is.na(master_df$list_district))
+sum(master_df$isListed == 0) # all variables have same num. of candidates that are not listed, hence correct encoding
+
+##### --------------------------- Export datasets ------------------------ #####
 
 # Save data as CSV file - master_all_cand is the master dataframe including all direct candidates, irrespective of having a twitter account
 write_csv(master_df, "Clean Data/master_all_cand.csv")
@@ -308,6 +403,7 @@ write_csv(master_twitter_only, "Clean Data/master_twitter_cand.csv")
 ### dataset. Twitter ID dataset only includes candidates of largest parties: SPD, CDU, 
 ### FDP, GRÜNE, DIE LINKE and AfD. 
 
+##### --------------------------- Twitter ID Data ------------------------ #####
 # # # # # Prepare a seperate dataset for Twitter scraping # # # # #
 twitter_ID1 <- master_twitter_only %>%
   select(lastname, firstname, screen_name1, user_id1) %>%
@@ -332,6 +428,7 @@ write_csv(twitter_api, "Clean Data/Twitter/twitter_ids.csv")
 ### candidates in a district and also have a twitter ID. In total we have 1215 
 ### twitter IDs which we will proceed to scrape using the Twitter API. 
 
+##### -------------------------- Shapefile Dataset ----------------------- #####
 # # # # # Cleaning shapefile of election districts # # # # #
 # import specific libraries for GIS data
 library(plyr)
@@ -352,3 +449,40 @@ shapefiles <- join(shp_df, district_shp@data, by="id")
 
 # save data
 write_csv(shapefiles, "Clean Data/District_shapefiles.csv")
+
+#####------------------- GLES 2021 Election Study Data ------------------- #####
+
+# import merged GLES data
+df_gles <- read_dta("Raw Data/GLES 2021/ZA7704_v1-0-0_merge.dta")
+
+sum(df_gles$twitter_acc == "NA") # 187 candidates from 735 do not have a Twitter Account
+sum(df_gles$sum_posts == "NA") # 512 candidates from 735 were not active on Twitter (no scraping of their tweets)
+
+df_gles <- df_gles %>%
+  select(-(1:27)) %>% # remove all structural variables of the study
+  select(1:11, "a1", starts_with("a2"), "a4", "b1a", "b1b", "b2", starts_with("b3"),
+         "b4", "b5", starts_with("b6"), starts_with("b7"), starts_with("b8"), "b9", starts_with("b17"), starts_with("e8"),
+         starts_with("e9"), starts_with("e10"), "e12", "twitter_acc":"avg_posts_time_group4") %>% #only keep variables of interest
+  mutate_all(list(~na_if_in(., c(-71, -73, -91, -92, -93, -94, -95, -97, -98, -99)))) %>% # fix numeric NA values from survey
+  mutate_all(list(~na_if_in(., c("-71", "-73","-91", "-92", "-93", "-94", "-95", "-97", "-98", "-99", "-97 trifft nicht zu")))) %>% # fix string NA values from survey
+  mutate(wknr = str_pad(as.numeric(wknr), 3, side = "left", pad = "0")) %>% # change encoding of election district numbers
+  rename(district_num = wknr) %>% # rename variables to English
+  left_join(structural_df, by = "district_num") # merge data with structural data from election districts
+
+# checking the labels on various variables
+unique(df_gles$bundesland)
+unique(df_gles$partei)
+unique(df_gles$kandidaturtyp)
+unique(df_gles$e8)
+
+# Clean highest educational achievement - add bachelor/master/PhD to list
+df_gles <- df_gles %>%
+  mutate(e8 = if_else(e9i == 1, 8, # bachelor degree
+                      if_else(e9j == 1, 9, # master degree
+                              if_else(e9k == 1, 10, as.numeric(e8))))) # doctor
+
+table(df_gles$e8)
+
+# export
+write.csv(df_gles, "Clean Data/GLES_2021.csv", row.names = FALSE)
+

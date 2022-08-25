@@ -1,11 +1,10 @@
 # Data visualizations
-# Date: 23.06.2022
+# Date: 22.08.2022
 # Author: Alec Eisenkolb
 
-# For this code to work, user must have previously ran the Twitter API functions
-# "Twitter API Code.py", as well as the previous data cleaning function in R:
+# For this code to work, user must have previously run the following data cleaning function in R:
 # "01 Data Cleaning.R", "02 District Predictions.R", "03 Twitter Cleaning.R" &
-# "04 Twitter Replies Cleaning.R"
+# "04 Twitter Replies Cleaning.R", as well as the python code to scrape the Twitter data "Twitter API.py". 
 
 # install libraries, uncomment below if necessary
 # install.packages("devtools")
@@ -94,6 +93,15 @@ df_shp <- read_csv("Clean Data/District_shapefiles.csv") %>%
   mutate(WKR_NR = str_pad(WKR_NR, 3, side = "left", pad = "0")) %>%
   rename(district_num = WKR_NR)
 
+# # # # # Graph 0: party distribution # # # # #
+df_master %>%
+  group_by(party) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x=reorder(party, -n), y=n)) +
+  geom_bar(stat="identity") +
+  xlab("Party") +
+  ylab("Frequency")
+
 # # # # # Graph 1: Gender distribution # # # # #
 
 # total data (all candidates)
@@ -164,12 +172,14 @@ df_master %>%
   xlab("Percentage Vote for Party per District") +
   ylab("Frequency")
 
-# total & diff 1st to 2nd Vote (1st Vote - 2nd Vote per candidate)
+# diff 1st to 2nd Vote (1st Vote - 2nd Vote per candidate)
 df_master %>%
-  ggplot(aes(x=pctpoint_diff_1to2)) +
-  geom_histogram(color = "#000000", binwidth = 0.5) +
-  xlab("Percentage Point Difference between 1st and 2nd Vote") +
-  ylab("Frequency")
+  filter(pct_diff_1to2 < 100 & pct_diff_1to2 > -100) %>%
+  ggplot(aes(x=pct_diff_1to2)) +
+  geom_histogram(color = "#000000", binwidth = 1) +
+  xlab("Percentage Difference between 1st and 2nd Vote") +
+  ylab("Frequency") +
+  scale_x_continuous(labels = function(x) {paste(x, "%")})
 
 # # # # # Graph 4: Geo-data of candidates # # # # #
 
@@ -196,13 +206,8 @@ ggthemr(party_noFDP, layout = "clean", spacing = 1)
 # Direct vote (1st vote)
 df_shp %>%
   left_join((df_master %>%
-               group_by(district_num, party) %>%
-               summarise(value = max(percent_1),
-                         party=party) %>%
-               ungroup() %>%
-               drop_na() %>%
-               group_by(district_num) %>%
-               filter(value==max(value))),
+               filter(winner==1) %>%
+               select(district_num, party)),
             by = "district_num") %>%
   ggplot(aes(x = long, y = lat)) +
   geom_polygon(aes(fill = party, group = group), colour = "#000000") +
@@ -241,7 +246,9 @@ df_shp %>%
   map_axes +
   scale_fill_gradient(low = "yellow", high = "#013220", na.value = "#ffffff") +
   labs(fill="2018 Log GDP (€)")
- 
+
+##### ??? Perhaps do log GDP per capita by dividing by population in each region?
+
 # map of employment rates
 df_shp %>%
   left_join((df_master %>%
@@ -270,6 +277,8 @@ df_shp %>%
   labs(fill="Graduates per 1000 Inhabitants")
 
 # # # # # Graph 6: Twitter Usage (posts) # # # # #
+ggthemr_reset()
+ggthemr(graph_theme, layout = "clean", spacing = 1)
 
 # total
 df_master %>%
@@ -286,7 +295,20 @@ df_master %>%
   geom_density_ridges(show.legend = FALSE) +
   xlab("Average Weekly Posts") +
   ylab("Party")
-  
+
+# by time (4 time groups of July, August, September, and post-election)
+df_master %>%
+  select(firstname, lastname, Avg_posts_time_group1, Avg_posts_time_group2, 
+         Avg_posts_time_group3, Avg_posts_time_group4) %>%
+  gather("Time", "value", 3:6) %>%
+  drop_na() %>%
+  filter(value <= 100) %>%
+  ggplot(aes(x=Time, y=value)) +
+  geom_boxplot(fill = "#b3cf99") +
+  scale_x_discrete(labels = c("July", "August", "September - Election", "Post-Election")) +
+  xlab("Average Weekly Posts") +
+  ylab("Frequency")
+
 # # # # # Graph 7: Distribution of likes, replies, retweets and language # # # # #
 
 # total (candidates w Twitter) likes per post
@@ -405,7 +427,7 @@ df_master %>%
 # by weekly posts & difference of 1st to 2nd vote per candidate
 df_master %>%
   filter(Avg_Weekly_Posts <= 100) %>%
-  ggplot(aes(x=Avg_Weekly_Posts, y=pctpoint_diff_1to2)) +
+  ggplot(aes(x=Avg_Weekly_Posts, y=pct_diff_1to2)) +
   geom_point() +
   xlab("Average Weekly Posts") +
   ylab("Difference of 1st to 2nd Vote") +
@@ -414,7 +436,7 @@ df_master %>%
 # by likes & difference of 1st to 2nd vote per candidate
 df_master %>%
   filter(Mean_Likes <= 100) %>%
-  ggplot(aes(x=Mean_Likes, y=pctpoint_diff_1to2)) +
+  ggplot(aes(x=Mean_Likes, y=pct_diff_1to2)) +
   geom_point() +
   xlab("Average Likes") +
   ylab("Difference of 1st to 2nd Vote") +
@@ -436,7 +458,8 @@ df_master %>%
   geom_bar(position="dodge", stat="identity") +
   xlab("Party") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#a3c585"))
 
 # check distribution of 1st votes - histogram
 df_master %>%
@@ -486,7 +509,8 @@ df_master %>%
   geom_bar(position="dodge", stat="identity") +
   xlab("Incumbent") + 
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#a3c585"))
 
 # check distribution of location (states)
 df_master %>%
@@ -497,7 +521,8 @@ df_master %>%
     geom_bar(position="dodge", stat = "identity") +
   xlab("State") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#a3c585"))
 
 # check distribution of gender
 df_master %>%
@@ -509,7 +534,8 @@ df_master %>%
   geom_bar(stat="identity", position="dodge") +
   xlab("Twitter Account") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#a3c585"))
 
 # check distribution of birth year - histogram
 df_master %>% 
@@ -531,15 +557,132 @@ df_master %>%
 
 # # # # # Testing balance between arms of treatment (levels of activity on Twitter) # # # # #
 
+# define the 33% and 66% quantiles of average weekly posting activity
+summary(df_master$Avg_Weekly_Posts)
+perc_33 <- as.numeric(quantile(df_master$Avg_Weekly_Posts, probs = 0.33, na.rm = TRUE))
+perc_66 <- as.numeric(quantile(df_master$Avg_Weekly_Posts, probs = 0.66, na.rm = TRUE))
 
+# define arms of treatment: low / medium / high posting activity
+df_master <- df_master %>%
+  mutate(Twitter_act = if_else((Avg_Weekly_Posts <= perc_33), as.character("Low"),
+                               if_else((Avg_Weekly_Posts > perc_33 & Avg_Weekly_Posts <= perc_66), as.character("Medium"), 
+                                       if_else((Avg_Weekly_Posts > perc_66), as.character("High"), as.character(NA)))))
 
+# order variable
+df_master$Twitter_act <- ordered(df_master$Twitter_act, levels = c("High", "Medium", "Low"))
+
+# check whether candidates present in all major parties
+df_master %>%
+  group_by(party, Twitter_act) %>%
+  summarise(count = n()) %>%
+  drop_na() %>%
+  ggplot(aes(x=party, y=count, fill=Twitter_act)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Party") +
+  ylab("Frequency") +
+  labs(fill="Legend") +
+  scale_fill_manual(values = c("#4b6043", "#87ab69", "#b3cf99"))
+
+# check distribution of 1st votes - histogram
+df_master %>%
+  select(percent_1, Twitter_act) %>%
+  drop_na() %>%
+  ggplot(aes(x=percent_1, fill=Twitter_act)) +
+  geom_histogram(color = "#000000", binwidth = 1) +
+  scale_fill_manual(values=c("#4b6043", "#87ab69", "#b3cf99")) +
+  xlab("Percentage Vote for Direct Candidates") +
+  ylab("Frequency") +
+  labs(fill="Legend")
+
+# check distribution of 1st votes - boxplot
+df_master %>%
+  select(percent_1, Twitter_act) %>%
+  drop_na() %>%
+  ggplot(aes(y=percent_1, x=Twitter_act)) +
+  geom_boxplot(color = "#000000") +
+  xlab("Twitter Activity") +
+  ylab("Percentage Vote for Direct Candidates")
+
+# check distribution of 1st - 2nd votes - histogram
+df_master %>%
+  select(pctpoint_diff_1to2, Twitter_act) %>%
+  drop_na() %>%
+  ggplot(aes(x=pctpoint_diff_1to2, fill=Twitter_act)) +
+  geom_histogram(color = "#000000", binwidth = 0.5) +
+  scale_fill_manual(values=c("#4b6043", "#87ab69", "#b3cf99")) +
+  xlab("%-Point Difference of 1st to 2nd Vote") +
+  ylab("Frequency") +
+  labs(fill="Legend")
+
+# check distribution of 1st - 2nd votes - boxplot
+df_master %>%
+  select(pctpoint_diff_1to2, Twitter_act) %>%
+  drop_na() %>%
+  ggplot(aes(y=pctpoint_diff_1to2, x=Twitter_act)) +
+  geom_boxplot(color = "#000000") +
+  xlab("Twitter Activity") +
+  ylab("%-Point Difference of 1st to 2nd Vote")
+
+# check distribution of being incumbent
+df_master %>%
+  mutate(incumbent = if_else(incumbent==1, "Yes", "No")) %>%
+  group_by(incumbent, Twitter_act) %>%
+  summarise(value = n()) %>%
+  drop_na() %>%
+  ggplot(aes(x=incumbent, y=value, fill=Twitter_act)) +
+  geom_bar(position="dodge", stat="identity") +
+  xlab("Incumbent") + 
+  ylab("Frequency") +
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#87ab69", "#b3cf99"))
+
+# check distribution of location (states)
+df_master %>%
+  group_by(state_short, Twitter_act) %>%
+  summarise(count = n()) %>%
+  drop_na() %>%
+  ggplot(aes(x=state_short, y=count, fill=Twitter_act)) +
+  geom_bar(position="dodge", stat = "identity") +
+  xlab("State") +
+  ylab("Frequency") +
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#87ab69", "#b3cf99"))
+
+# check distribution of gender
+df_master %>%
+  mutate(gender = if_else(gender==0, "Female", "Male")) %>%
+  group_by(gender, Twitter_act) %>%
+  summarise(value = n()) %>%
+  drop_na() %>%
+  ggplot(aes(x=Twitter_act, y=value, fill=gender)) +
+  geom_bar(stat="identity", position="dodge") +
+  xlab("Twitter Account") +
+  ylab("Frequency") +
+  labs(fill="Legend") +
+  scale_fill_manual(values=c("#4b6043", "#a3c585"))
+
+# check distribution of birth year - histogram
+df_master %>% 
+  select(birth_year, Twitter_act) %>%
+  drop_na() %>%
+  ggplot(aes(x=birth_year, fill=Twitter_act)) +
+  geom_histogram(colour="#000000", binwidth=2) +
+  scale_fill_manual(values = c("#4b6043", "#87ab69", "#b3cf99")) +
+  xlab("Year of Birth") +
+  ylab("Frequency") +
+  labs(fill="Legend")
+
+# check distribution of birth year - boxplot
+df_master %>% 
+  select(birth_year, Twitter_act) %>%
+  drop_na() %>%
+  ggplot(aes(y=birth_year, x=Twitter_act)) +
+  geom_boxplot(colour="#000000") +
+  xlab("Twitter Account") +
+  ylab("Year of Birth")
 
 ##### Checking for common support between control and treatment group!
 
-
-##### Testing differences in means of distributions of outcome between treatment and control group!
-
-# see: Towards Data Science Article on iPhone images!
 
 
 

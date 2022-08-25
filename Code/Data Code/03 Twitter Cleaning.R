@@ -107,6 +107,9 @@ df_tweets <- df_tweets %>%
 # check column types
 sapply(df_tweets, class)
 
+# export df_tweets as CSV for further API progress
+write.csv(df_tweets, paste0(EXPORT_PATH, "twitter_clean.csv"), row.names = FALSE)
+
 # import dataframe with candidate names and Twitter User IDs 
 # NOTE: merging by user ID is not possible as some candidates have multiple twitter accounts
 df_user_ids <- read_csv(paste0(IMPORT_PATH, "Twitter/twitter_ids.csv"), col_types = "cccc")
@@ -119,12 +122,20 @@ df_user_ids <- df_user_ids %>%
   rename(`User ID` = user_id) 
 
 # merge twitter data with dataframe of candidate names & 
-# group by candidates names and summarise information on likes, replies and re-tweets
+# create time variables indicating postings to be pre or post election
 User_Tweet_Info <- df_tweets %>%
   left_join(df_user_ids, by = "User ID") %>%
+  mutate(Pre_Elec = if_else(Day <= as.POSIXct("2021-09-26"), 1, 0), # create Dummy whether post was made before election
+         Time_group = if_else(format(Day, "%m") == "07", 1, # category 1: posts made in July
+                              if_else(format(Day, "%m") == "08", 2, # category 2: posts made in August
+                                      if_else(format(Day, "%m") == "09" & Day <= as.POSIXct("2021-09-26"), 3, # category 3: posts in September AND before election
+                                              if_else(Day > as.POSIXct("2021-09-26"), 4, as.numeric(NA)))))) # category 4: posts after election
+  
+# group by candidates names and summarise information on likes, replies and re-tweets
+Tweet_summary <- User_Tweet_Info %>%
   group_by(firstname, lastname) %>%
   summarise(Sum_Posts = sum(n()),
-            Avg_Weekly_Posts = sum(n())/14, # collection of tweets over period of 14 weeks (1st July - 10th Oct. 2021)
+            Avg_Weekly_Posts = (sum(n())/102)*7, # average weekly posts: divide by # of days (102) and multiply by 7 days per week (1st July - 10th Oct. 2021)
             Mean_Likes = mean(Likes),
             Min_Likes = min(Likes),
             Max_Likes = max(Likes),
@@ -140,6 +151,33 @@ User_Tweet_Info <- df_tweets %>%
             Max_RT = max(Retweets),
             Med_RT = median(Retweets),
             Sd_RT = sd(Retweets))
+
+# group by candidate names and timings of posts (pre and post election only)
+Tweet_summary_posts <- User_Tweet_Info %>%
+  group_by(firstname, lastname, Pre_Elec) %>%
+  summarise(Avg_Posts = n()) %>%
+  pivot_wider(names_from = "Pre_Elec", values_from = "Avg_Posts", names_prefix = "Pre_Elec_") %>%
+  mutate(Pre_Elec_0 = if_else(is.na(Pre_Elec_0), as.numeric(0), as.numeric(Pre_Elec_0)),
+         Pre_Elec_1 = if_else(is.na(Pre_Elec_1), as.numeric(1), as.numeric(Pre_Elec_1))) %>%
+  mutate(Pre_Elec_0 = as.numeric((Pre_Elec_0/14)*7), # average weekly posts after election (14 days between 27.09 - 10.10.2021)
+         Pre_Elec_1 = as.numeric((Pre_Elec_1/88)*7)) %>% # average weekly posts before election (88 days between 01.07 - 26.09.2021)
+  rename(Avg_posts_pre_elec1 = Pre_Elec_1,
+         Avg_posts_pre_elec0 = Pre_Elec_0)
+  
+# group by candidate names and timings of posts (using different Time groups)
+Tweet_summary_posts2 <- User_Tweet_Info %>%
+  group_by(firstname, lastname, Time_group) %>%
+  summarise(Avg_Posts = n()) %>%
+  pivot_wider(names_from = "Time_group", values_from = "Avg_Posts", names_prefix = "Time_group") %>%
+  mutate_at(vars(Time_group1:Time_group4), ~replace(., is.na(.), 0)) %>% 
+  mutate(Time_group1 = as.numeric((Time_group1/31)*7), # average weekly posts in July (31 days between 01.07 - 31.07.2021)
+         Time_group2 = as.numeric((Time_group2/31)*7), # average weekly posts in August (31 days between 01.08 - 31.08.2021)
+         Time_group3 = as.numeric((Time_group3/26)*7), # average weekly posts in September until election (26 days between 01.09 - 26.09.2021)
+         Time_group4 = as.numeric((Time_group4/14)*7)) %>% # average weekly posts after election (14 days between 27.09 - 10.10.2021)
+  rename(Avg_posts_time_group1 = Time_group1,
+         Avg_posts_time_group2 = Time_group2,
+         Avg_posts_time_group3 = Time_group3,
+         Avg_posts_time_group4 = Time_group4)
 
 # obtain information on language of tweets
 df_tweet_info <- df_tweets %>%
@@ -170,20 +208,27 @@ df_tweet_info <- df_tweet_info %>%
 
 # Merge with other tweet info dataset
 df_tweet_info <- df_tweet_info %>%
-  left_join(User_Tweet_Info, by = c("firstname", "lastname"))
+  left_join(Tweet_summary, by = c("firstname", "lastname")) %>%
+  left_join(Tweet_summary_posts, by = c("firstname", "lastname")) %>%
+  left_join(Tweet_summary_posts2, by = c("firstname", "lastname"))
 
 ### merge with main candidates dataframe (master_all_cand)
 # import master candidates dataframe
 df_master <- read_csv(paste0(IMPORT_PATH, "master_all_cand.csv"))
 
+# merge data and encode the mean posting activity, likes, replies and retweets
+# for Twitter account holders who were not active at all from NA to 0. 
+variables <- c("Avg_Weekly_Posts", "Avg_posts_pre_elec0", "Avg_posts_pre_elec1",
+               "Avg_posts_time_group1", "Avg_posts_time_group2", "Avg_posts_time_group3",
+               "Avg_posts_time_group4", "Mean_Likes", "Mean_Reply", "Mean_RT")
+
 df_master <- df_master %>%
-  left_join(df_tweet_info, by = c("firstname", "lastname"))
+  left_join(df_tweet_info, by = c("firstname", "lastname")) %>%
+  mutate(across(all_of(variables), ~ if_else((is.na(.) & Twitter_Acc == 1), as.numeric(0), as.numeric(.))))
 
 # save master dataframe
 write.csv(df_master, "Clean Data/master_all_cand.csv", row.names = FALSE)
 
-# export df_tweets as CSV for further API progress
-write.csv(df_tweets, paste0(EXPORT_PATH, "twitter_clean.csv"), row.names = FALSE)
-
 # clean memory
-rm(df_tweet_info, df_user_ids, User_Tweet_Info, df_tweets, df_master, lang)
+rm(df_tweet_info, df_user_ids, User_Tweet_Info, df_tweets, df_master, lang, 
+   Tweet_summary, Tweet_summary_posts, Tweet_summary_posts2)
