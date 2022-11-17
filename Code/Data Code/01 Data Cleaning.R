@@ -33,7 +33,7 @@ election_df <- election_df %>%
          Prozent) %>% # selecting specific variables (removing election results from past election)
   pivot_wider(names_from = Stimme, values_from = c(Anzahl, Prozent)) %>% # Create wide version of election results
   mutate(Pzt_diff_1to2 = as.numeric(((Prozent_1 - Prozent_2)/Prozent_2)*100)) %>% # compute outcome variable: difference of erststimme to zweitstimme per district (%-diff)
-  filter(Pzt_diff_1to2 != is.na(Pzt_diff_1to2)) %>%
+  #filter(Pzt_diff_1to2 != is.na(Pzt_diff_1to2)) %>%
   rename(district_num = Gebietsnummer,
          district = Gebietsname,
          party = Gruppenname,
@@ -175,10 +175,13 @@ structural_df <- structural_df %>%
          district_unemprate_male = Arbeitslosenquote.Februar.2021...Männer,
          district_unemprate_female = Arbeitslosenquote.Februar.2021...Frauen,
          district_unemprate_age_15_24 = Arbeitslosenquote.Februar.2021...15.bis.24.Jahre,
-         district_unemprate_age_55_64 = Arbeitslosenquote.Februar.2021...55.bis.64.Jahre) # change column name to English
+         district_unemprate_age_55_64 = Arbeitslosenquote.Februar.2021...55.bis.64.Jahre) %>% # change column name to English
+  mutate(district_age_60over = district_age_60_74 + district_age_75over) 
 
 # check classes again
 sapply(structural_df, class)
+
+cor(structural_df$district_avg_income, structural_df$district_unemprate_total)
 
 ##### --------------------- import twitter ID dataset -------------------- #####
 ### This data contains a list of all twitter accounts with their respective IDs
@@ -285,7 +288,8 @@ master_df <- master_df %>%
          list_place = if_else(((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029")), as.numeric(1), as.numeric(list_place)),
          isDC = if_else((firstname=="Hans Olaf" & lastname=="Kappelt" & district_num=="029"), as.numeric(1), as.numeric(isDC)))
 
-### All information which has been manually entered above was taken from the following sources:
+### All information which has been manually entered above was taken from the following sources
+### as well as the data from the candidacy data set:
 
 ### Der Bundeswahlleiter. (2021, Aug 5). Bundestagswahl 2021: Bundeswahlausschuss hat über
 ### Beschwerden entschieden. Der Bundeswahlleiter. https://www.bundeswahlleiter.de/info/presse/mitteilungen/bundestagswahl-2021/22_21_2bwa-entscheidung.html.
@@ -385,6 +389,13 @@ sum(is.na(master_df$list_party))
 sum(is.na(master_df$list_district))
 sum(master_df$isListed == 0) # all variables have same num. of candidates that are not listed, hence correct encoding
 
+test <- candidate_df %>%
+  left_join(twitterid_df, by = c("district_num", "party"))
+
+test %>%
+  filter(is.na(Twitter_Acc)) %>%
+  view()
+
 ##### --------------------------- Export datasets ------------------------ #####
 
 # Save data as CSV file - master_all_cand is the master dataframe including all direct candidates, irrespective of having a twitter account
@@ -458,30 +469,142 @@ df_gles <- read_dta("Raw Data/GLES 2021/ZA7704_v1-0-0_merge.dta")
 sum(df_gles$twitter_acc == "NA") # 187 candidates from 735 do not have a Twitter Account
 sum(df_gles$sum_posts == "NA") # 512 candidates from 735 were not active on Twitter (no scraping of their tweets)
 
-df_gles <- df_gles %>%
-  select(-(1:27)) %>% # remove all structural variables of the study
-  select(1:11, "a1", starts_with("a2"), "a4", "b1a", "b1b", "b2", starts_with("b3"),
-         "b4", "b5", starts_with("b6"), starts_with("b7"), starts_with("b8"), "b9", starts_with("b17"), starts_with("e8"),
-         starts_with("e9"), starts_with("e10"), "e12", "twitter_acc":"avg_posts_time_group4") %>% #only keep variables of interest
-  mutate_all(list(~na_if_in(., c(-71, -73, -91, -92, -93, -94, -95, -97, -98, -99)))) %>% # fix numeric NA values from survey
-  mutate_all(list(~na_if_in(., c("-71", "-73","-91", "-92", "-93", "-94", "-95", "-97", "-98", "-99", "-97 trifft nicht zu")))) %>% # fix string NA values from survey
-  mutate(wknr = str_pad(as.numeric(wknr), 3, side = "left", pad = "0")) %>% # change encoding of election district numbers
-  rename(district_num = wknr) %>% # rename variables to English
-  left_join(structural_df, by = "district_num") # merge data with structural data from election districts
-
 # checking the labels on various variables
 unique(df_gles$bundesland)
 unique(df_gles$partei)
 unique(df_gles$kandidaturtyp)
 unique(df_gles$e8)
 
+# clean GLES dataset
+df_gles <- df_gles %>%
+  mutate(Incumbent = if_else(a2a==3, 1, 0), # create an incumbent variable based on their success during last federal election
+         IsListed = if_else((kandidaturtyp==1 | kandidaturtyp==3), 1, 0)) %>% # create dummy variable whether candidate is listed in state party list for election
+  select(-(1:27)) %>% # remove all structural variables of the study
+  select(1:11, "a1", starts_with("a2"), "a4", "b1a", "b1b", "b2", starts_with("b3"),
+         "b4", "b5", starts_with("b6"), starts_with("b7"), starts_with("b8"), "b9", 
+         starts_with("b17"), starts_with("e8"), starts_with("e9"), starts_with("e10"), 
+         "e12", "twitter_acc":"avg_posts_time_group4", Incumbent, IsListed, east_germany) %>% #only keep variables of interest
+  mutate_all(list(~na_if_in(., c(-71, -73, -91, -92, -93, -94, -95, -97, -98, -99)))) %>% # fix numeric NA values from survey
+  mutate_all(list(~na_if_in(., c("-71", "-73","-91", "-92", "-93", "-94", "-95", 
+                                 "-97", "-98", "-99", "-97 trifft nicht zu")))) %>% # fix string NA values from survey
+  mutate(wknr = str_pad(as.numeric(wknr), 3, side = "left", pad = "0")) %>% # change encoding of election district numbers
+  rename(district_num = wknr) %>% # rename variables to English
+  left_join(structural_df, by = "district_num") %>% # merge data with structural data from election districts
+  mutate(percent_election_erststimme = as.numeric(percent_election_erststimme),
+         percent_election_zweitstimme = as.numeric(percent_election_zweitstimme)) # transform strings into numeric variables
+
 # Clean highest educational achievement - add bachelor/master/PhD to list
 df_gles <- df_gles %>%
-  mutate(e8 = if_else(e9i == 1, 8, # bachelor degree
-                      if_else(e9j == 1, 9, # master degree
-                              if_else(e9k == 1, 10, as.numeric(e8))))) # doctor
+  mutate(e8 = if_else(e9i == 1, 8, # 8 = bachelor degree
+                      if_else(e9j == 1, 9, # 9 = master degree
+                              if_else(e9k == 1, 10, as.numeric(e8))))) # 10 = doctor
 
+# check consistency of variables created above (count observations for unique values in variables)
 table(df_gles$e8)
+table(df_gles$IsListed)
+table(df_gles$kandidaturtyp)
+
+summary(df_gles$percent_election_erststimme)
+summary(df_gles$percent_election_zweitstimme)
+
+# Change numerical encoding of party to string names of each party
+# create tribble to transform party from numeric to string name (taken from labels of variable)
+party_table <- tribble(
+  ~Number, ~Name,
+  1, "CDU",
+  2, "CDU",
+  3, "CSU",
+  4, "SPD",
+  5, "FDP",
+  6, "GRÜNE",
+  7, "DIE LINKE",
+  322, "AfD"
+)
+
+# Add new variable "party" with names rather than numbers
+df_gles <- df_gles %>%
+  mutate(party = as.character(mgsub(as.numeric(partei), party_table$Number, party_table$Name)))
+
+# check consistency of new party variable
+table(df_gles$partei)
+table(df_gles$party)
+table(df_gles$e8)
+
+# create IV variable from response b8 (8 questions on politicians views on social media)
+df_gles <- df_gles %>%
+  filter(kandidaturtyp == 2 | kandidaturtyp == 3) %>% # filter only for direct candidates
+  mutate(b8d = if_else(b8d==1, 5,
+                       if_else(b8d==2, 4,
+                               if_else(b8d==4, 2,
+                                       if_else(b8d==5, 1, as.numeric(b8d))))),
+         b8g = if_else(b8g==1, 5,
+                       if_else(b8g==2, 4,
+                               if_else(b8g==4, 2,
+                                       if_else(b8g==5, 1, as.numeric(b8g)))))) %>%
+  mutate(SM_preference = as.numeric(b8a + b8b + b8c + b8d + b8e + b8f + b8g + b8h)/8) # create preference variable
+
+# create the constituency-level age distribution variable of 60+ population AND have to create
+# dummy variables for party otherwise regressions won't run properly
+df_gles <- df_gles %>%
+  mutate(district_age_60over = district_age_60_74 + district_age_75over) %>%
+  mutate(partyCDU = if_else(party=="CDU", 1, 0),
+         partyCSU = if_else(party=="CSU", 1, 0),
+         partyDIELINKE = if_else(party=="DIE LINKE", 1, 0),
+         partyFDP = if_else(party=="FDP", 1, 0),
+         partyGRUENE = if_else(party=="GRÜNE", 1, 0),
+         partySPD = if_else(party=="SPD", 1, 0)) %>%
+  mutate(Educ = if_else((e8==5 | e8==4), "High School",
+                        if_else((e8==8 | e8==9 | e8==10), "University Degree", "Other"))) %>%
+  mutate(Twitter_GLES = if_else(b7t==0, 0, 
+                                if_else(is.na(b7t), as.numeric(NA), 1))) # Create a GLES Twitter variable
+
+# Check how similar the GESIS twitter and GLES twitter variables are 
+# Note: encoded differently, hence should not necessarily be identical!
+table(df_gles$b7t)
+table(df_gles$Twitter_GLES)
+table(df_gles$Twitter_GLES==df_gles$twitter_acc)
+
+# Check consistency of other variables (education and party encodings!)
+table(df_gles$Educ)
+table(df_gles$party)
+table(df_gles$partyCDU)
+table(df_gles$partyCSU)
+table(df_gles$partyDIELINKE)
+table(df_gles$partyFDP)
+table(df_gles$partyGRUENE)
+table(df_gles$partySPD)
+
+# create social media variables (Facebook, Youtube and All of Social Media)
+df_gles <- df_gles %>%
+  mutate(Facebook_acc = if_else(b7s == 0, 0, 
+                                if_else(is.na(b7s), as.numeric(NA), 1)),
+         Youtube_acc = if_else(b7u == 0, 0,
+                               if_else(is.na(b7u), as.numeric(NA), 1)),
+         Social_media_OR = if_else((b7s == 0 & b7t == 0 & b7u == 0), 0,
+                                if_else((is.na(b7s) & is.na(b7t) & is.na(b7u)), as.numeric(NA), 1))) %>%
+  mutate(FB_TW_acc = if_else(Facebook_acc == 1 & Twitter_GLES == 1, 1, 0)) %>% # variable for candidates who own both Facebook and Twitter
+  mutate(Social_media_AND = if_else(Facebook_acc==1 & Twitter_GLES==1 & Youtube_acc==1, 1, 0))
+
+# check consistency of above variables
+table(df_gles$Facebook_acc)
+table(df_gles$Youtube_acc)
+table(df_gles$FB_TW_acc)
+table(df_gles$Social_media_OR)
+table(df_gles$b7s)
+table(df_gles$b7t)
+table(df_gles$b7u)
+
+# Check how many candidates have only or both FB and Twitter
+df_gles <- df_gles %>%
+  mutate(SM_Check = if_else(Twitter_GLES == 1 & Facebook_acc == 1 & Youtube_acc == 1, "All",
+                            if_else(Twitter_GLES == 1 & Facebook_acc == 0 & Youtube_acc == 0, "Twitter only",
+                                    if_else(Twitter_GLES == 0 & Facebook_acc == 1 & Youtube_acc == 0, "Facebook only",
+                                            if_else(Twitter_GLES == 0 & Facebook_acc == 0 & Youtube_acc == 1, "Youtube only",
+                                                    if_else(Twitter_GLES == 1 & Facebook_acc == 1 & Youtube_acc == 0, "FB and Twitter",
+                                                            if_else(Twitter_GLES == 0 & Facebook_acc == 1 & Youtube_acc == 1, "FB and Youtube",
+                                                                    if_else(Twitter_GLES == 1 & Facebook_acc == 0 & Youtube_acc == 1, "Twitter and Youtube", 
+                                                                            if_else(Twitter_GLES == 0 & Facebook_acc == 0 & Youtube_acc == 0, "None", "Other")))))))))
+
 
 # export
 write.csv(df_gles, "Clean Data/GLES_2021.csv", row.names = FALSE)

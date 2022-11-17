@@ -1,5 +1,5 @@
 # Data visualizations
-# Date: 22.08.2022
+# Date: 29.08.2022
 # Author: Alec Eisenkolb
 
 # For this code to work, user must have previously run the following data cleaning function in R:
@@ -43,6 +43,9 @@ theme2 <- define_palette(
   gradient = c(lower = colourful_palette[1L], upper = colourful_palette[2L]),
   background = '#ffffff'
 )
+library(scales)
+show_col(colourful_palette)
+show_col(green_palette)
 
 # define third colour scheme (used to match colour of official party colour)
 full_party_col <- c("#0000FF", "#000000", "#373737", "#FF00FF", "#F5FF00", "#35682d", "#ff0000")
@@ -72,7 +75,8 @@ party_noCSU <- define_palette(
 )
 
 # set new theme as default
-ggthemr(graph_theme, layout = "clean", spacing = 1)
+ggthemr_reset()
+ggthemr(theme2, layout = "clean", spacing = 1)
 
 # define ggplot2 theme for maps (excluding axes and titles)
 map_axes <- theme(
@@ -92,6 +96,10 @@ df_userids <- read_csv("Clean Data/Twitter/twitter_ids.csv", col_types = "cccc")
 df_shp <- read_csv("Clean Data/District_shapefiles.csv") %>%
   mutate(WKR_NR = str_pad(WKR_NR, 3, side = "left", pad = "0")) %>%
   rename(district_num = WKR_NR)
+
+df_master %>%
+  filter(party=="GRÜNE" & district_num > 295) %>%
+  view()
 
 # # # # # Graph 0: party distribution # # # # #
 df_master %>%
@@ -136,8 +144,10 @@ df_master %>%
   geom_bar(position = "fill", stat = "identity") +
   labs(fill="Legend") +
   xlab("Party") +
-  ylab("Frequency") +
+  ylab("Share") +
   scale_y_continuous(labels = scales::percent)
+
+ggsave("Graphs/Master/Party_Gender_Share.png", dpi=300)
 
 # # # # # Graph 2: Age distribution # # # # # 
 
@@ -156,30 +166,47 @@ df_master %>%
   xlab("Year of Birth") + 
   ylab("Party")
 
-# # # # # Graph 3: Vote outcome of candidates w Twitter Acc. # # # # #
+ggsave("Graphs/Master/Party_Agedistribution.png", dpi=300)
 
-# total & 1st Vote
+# # # # # Graph 3: Vote outcome of candidates # # # # #
+
+# all candidates & 1st Vote
 df_master %>%
   ggplot(aes(x=percent_1)) +
   geom_histogram(color = "#000000", binwidth = 2) +
-  xlab("Percentage Vote for Direct Candidates") +
-  ylab("Frequency")
+  xlab("Vote Share") +
+  ylab("Frequency") +
+  scale_x_continuous(labels = function(x) {paste(x, "%")}) +
+  theme(text = element_text(family = "serif", size = 18))
 
-# total & 2nd Vote
+ggsave("Graphs/Master/Percent_1_distribution.png", dpi=300, width=9.5, height=7)
+
+# all candidates & 2nd Vote
 df_master %>%
   ggplot(aes(x=percent_2)) +
   geom_histogram(color = "#000000", binwidth = 2) +
-  xlab("Percentage Vote for Party per District") +
-  ylab("Frequency")
+  xlab("Vote Share") +
+  ylab("Frequency") +
+  scale_x_continuous(breaks = c(0, 20, 40), labels = function(x) {paste(x, "%")}) +
+  theme(text = element_text(family = "serif", size = 18))
 
-# diff 1st to 2nd Vote (1st Vote - 2nd Vote per candidate)
+ggsave("Graphs/Master/Percent_2_distribution.png", dpi=300, width=9.5, height=7)
+
+# all candidates & diff 1st to 2nd Vote (1st Vote - 2nd Vote per candidate)
 df_master %>%
   filter(pct_diff_1to2 < 100 & pct_diff_1to2 > -100) %>%
   ggplot(aes(x=pct_diff_1to2)) +
-  geom_histogram(color = "#000000", binwidth = 1) +
-  xlab("Percentage Difference between 1st and 2nd Vote") +
+  geom_histogram(color = "#000000", binwidth = 3) +
+  xlab("Percentage Difference") +
   ylab("Frequency") +
-  scale_x_continuous(labels = function(x) {paste(x, "%")})
+  scale_x_continuous(labels = function(x) {paste(x, "%")},
+                     breaks = pretty_breaks(n=6)) +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Pct_Diff.png", dpi=300, width=9.5, height=7)
+
+summary(df_master$pct_diff_1to2)
+sd(df_master$pct_diff_1to2, na.rm = TRUE)
 
 # # # # # Graph 4: Geo-data of candidates # # # # #
 
@@ -198,12 +225,23 @@ df_shp %>%
                       breaks=c(NA, 1, 2, 3, 4, 5, 6)) +
   labs(fill="Candidates")
 
+ggsave("Graphs/Master/Geo_number_candidates.png", dpi=300)
+
 # # # # # Graph 5: Geo-data of votes # # # # #
 # set map theme
 ggthemr_reset()
 ggthemr(party_noFDP, layout = "clean", spacing = 1)
 
-# Direct vote (1st vote)
+# check if direct mandate winners (1st vote) by number of party seats won is correct, 
+# compare with official results from: https://www.tagesschau.de/inland/btw21/bundestagswahl-wahlkarte-101.html
+df_master %>%
+  filter(winner==1) %>%
+  select(district_num, party) %>%
+  group_by(party) %>%
+  summarise(count = n()) %>%
+  view()
+
+# Graph of direct vote (1st vote)
 df_shp %>%
   left_join((df_master %>%
                filter(winner==1) %>%
@@ -213,12 +251,15 @@ df_shp %>%
   geom_polygon(aes(fill = party, group = group), colour = "#000000") +
   coord_fixed(1.4) +
   map_axes +
-  labs(fill="Party")
+  labs(fill="Party") +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Geo_Percent_1.png", dpi=300)
 
 # # # # # Graph: Geo-data of control variables per district # # # # #
 # reset theme
 ggthemr_reset()
-ggthemr(graph_theme, layout = "clean", spacing = 1)
+ggthemr(theme2, layout = "clean", spacing = 1)
 
 # map of household income per district
 df_shp %>%
@@ -246,8 +287,6 @@ df_shp %>%
   map_axes +
   scale_fill_gradient(low = "yellow", high = "#013220", na.value = "#ffffff") +
   labs(fill="2018 Log GDP (€)")
-
-##### ??? Perhaps do log GDP per capita by dividing by population in each region?
 
 # map of employment rates
 df_shp %>%
@@ -279,7 +318,6 @@ df_shp %>%
 # # # # # Graph 6: Twitter Usage (posts) # # # # #
 ggthemr_reset()
 ggthemr(graph_theme, layout = "clean", spacing = 1)
-
 # total
 df_master %>%
   filter(Twitter_Acc==1) %>%
@@ -290,7 +328,7 @@ df_master %>%
   
 # by party
 df_master %>%
-  filter(Avg_Weekly_Posts <= 100 & Twitter_Acc==1) %>%
+  filter(Avg_Weekly_Posts <= 50 & Twitter_Acc==1) %>%
   ggplot(aes(x=Avg_Weekly_Posts, y = fct_rev(as.factor(party)), fill=party)) +
   geom_density_ridges(show.legend = FALSE) +
   xlab("Average Weekly Posts") +
@@ -310,14 +348,17 @@ df_master %>%
   ylab("Frequency")
 
 # # # # # Graph 7: Distribution of likes, replies, retweets and language # # # # #
-
+ggthemr_reset()
+ggthemr(theme2, layout = "clean", spacing = 1)
 # total (candidates w Twitter) likes per post
 df_master %>%
-  filter(Mean_Likes < 500 & Twitter_Acc==1) %>%
+  filter(Mean_Likes < 200 & Twitter_Acc==1) %>%
   ggplot(aes(y=Mean_Likes, x=party)) +
   geom_boxplot(fill = "#b3cf99") +
   xlab("Party") +
   ylab("Likes per Post")
+
+ggsave("Graphs/Master/Likes_post.png", dpi=300)
 
 # total (candidates w Twitter) replies per post
 df_master %>%
@@ -327,6 +368,8 @@ df_master %>%
   xlab("Party") +
   ylab("Replies per Post")
 
+ggsave("Graphs/Master/Replies_post.png", dpi=300)
+
 # total (candidates w Twitter) re-tweets per post
 df_master %>%
   filter(Mean_RT < 1000 & Twitter_Acc==1) %>%
@@ -334,6 +377,8 @@ df_master %>%
   geom_boxplot(fill = "#b3cf99") +
   xlab("Party") +
   ylab("Re-Tweets per Post")
+
+ggsave("Graphs/Master/Retweets_post.png", dpi=300)
 
 # Language by party (define new theme for better contrast)
 ggthemr_reset()
@@ -372,7 +417,18 @@ df_twitter %>%
                       breaks = c("Total postings", "7-Day moving average"),
                       values = c("#4b6043", "#FFCC33")) +
   theme(legend.position = "bottom") +
-  geom_vline(xintercept = as.Date("2021-09-26"), linetype = "dotted", color = "#000000", size = 1)
+  geom_vline(xintercept = as.Date("2021-09-26"), linetype = "dotted", color = "#000000", size = 1) +
+  annotate(geom = "text",
+           label = c("Election Date"),
+           x = as.Date("2021-09-26"),
+           y = c(3750),
+           angle = 90, 
+           vjust = 1.5,
+           hjust = 0.5,
+           family = "serif") +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Posting_timeline_total.png", dpi=300, width=9.5, height=7)
 
 # by party (define new colour scheme for this chart)
 ggthemr_reset()
@@ -388,7 +444,7 @@ df_master_reduced <- df_master %>%
 df_twitter %>%
   left_join(df_userids, by = "User ID") %>%
   left_join(df_master_reduced, by = c("firstname", "lastname")) %>%
-  mutate(party = if_else(party=="CSU", "CDU", party)) %>%
+  mutate(party = if_else((party=="CSU" | party=="CDU"), "CDU/CSU", party)) %>%
   group_by(party, Day) %>%
   summarise(count = n()) %>%
   mutate(Mov_Avg = zoo::rollmean(count, k = 7, fill = NA)) %>%
@@ -399,12 +455,23 @@ df_twitter %>%
   ylab("Frequency of Posts") +
   theme(legend.position = "bottom") +
   labs(colour = "") +
-  geom_vline(xintercept = as.Date("2021-09-26"), linetype = "dotted", color = "#000000", size = 1)
+  geom_vline(xintercept = as.Date("2021-09-26"), linetype = "dotted", color = "#000000", size = 1) +
+  theme(text = element_text(family = "serif", size = 18)) +
+  annotate(geom = "text",
+           label = c("Election Date"),
+           x = as.Date("2021-09-26"),
+           y = c(600),
+           angle = 90, 
+           vjust = 1.5,
+           hjust = 0.5,
+           family = "serif")
+
+ggsave("Graphs/Master/Posting_timeline_party.png", dpi=300, width=9.5, height=7)
 
 # # # # # Graph: Scatterlot of vote outcome vs twitter usage # # # # #
 # reset theme
 ggthemr_reset()
-ggthemr(graph_theme, layout = "clean", spacing = 1)
+ggthemr(theme2, layout = "clean", spacing = 1)
 
 # by weekly posts & direct vote share (1st vote)
 df_master %>%
@@ -459,17 +526,65 @@ df_master %>%
   xlab("Party") +
   ylab("Frequency") +
   labs(fill="Legend") +
-  scale_fill_manual(values=c("#4b6043", "#a3c585"))
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Twitter_treatment_party.png", dpi=300, width=9.5, height=7)
+
+# Twitter profiles by party - relative frequencies
+df_master %>%
+  group_by(party, Twitter_Acc) %>%
+  summarise(quant = n()) %>%
+  mutate(freq = quant/sum(quant), 
+         Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", 
+                               if_else(Twitter_Acc==1, "Twitter", "NA"))) %>%
+  ungroup() %>%
+  arrange(desc(freq)) %>%
+  mutate(party = fct_inorder(as.factor(party))) %>%
+  ggplot(aes(fill=Twitter_Acc, x=party, y=freq)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(fill="Legend") +
+  xlab("Party") +
+  ylab("Share") +
+  scale_y_continuous(labels = scales::percent) +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Twitter_treatment_party_relative.png", dpi=300, width=9.5, height=7)
+
+# Compute same graph as above, but with three categories: no twitter, Twitter (non-active) and Twitter (active)
+df_master %>%
+  mutate(Twitter_Acc = if_else((Twitter_Acc==1 & Avg_Weekly_Posts==0), "Twitter (non-active)",
+                               if_else((Twitter_Acc==1 & Avg_Weekly_Posts!=0), "Twitter (active)", "No Twitter"))) %>%
+  #ordered(Twitter_Acc, levels = c("No Twitter", "Twitter (non-active)", "Twitter (active)")) %>%
+  group_by(party, Twitter_Acc) %>%
+  summarise(quant = n()) %>%
+  mutate(freq = quant/sum(quant)) %>%
+  ungroup() %>%
+  mutate(Twitter_check = if_else(Twitter_Acc=="No Twitter", -as.numeric(freq), as.numeric(NA))) %>%
+  mutate(Twitter_check =if_else(Twitter_Acc=="Twitter (non-active)", as.numeric(-60), as.numeric(Twitter_check))) %>%
+  arrange(desc(Twitter_check)) %>%
+  ggplot(aes(fill=fct_inorder(as.factor(Twitter_Acc)), x=fct_inorder(as.factor(party)), y=freq)) +
+  geom_bar(position = "fill", stat = "identity") +
+  labs(fill="Legend") +
+  xlab("Party") +
+  ylab("Share") +
+  scale_fill_manual(values=c("#658354", "#87ab69", "#b3cf99")) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Twitter_treatment_party_relative_three_categories.png", dpi=300, width=9.5, height=7)
 
 # check distribution of 1st votes - histogram
 df_master %>%
   mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
   ggplot(aes(x=percent_1, fill=Twitter_Acc)) +
   geom_histogram(color = "#000000", binwidth = 1) +
-  scale_fill_manual(values=c("#4b6043", "#a3c585")) +
-  xlab("Percentage Vote for Direct Candidates") +
+  xlab("Vote Share for Direct Candidates") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  scale_x_continuous(labels = function(x) {paste(x, "%")}) +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Vote1_treatment.png", dpi=300, width=9.5, height=7)
 
 # check distribution of 1st votes - boxplot
 df_master %>%
@@ -483,17 +598,18 @@ df_master %>%
 # check distribution of 1st - 2nd votes - histogram
 df_master %>%
   mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
-  ggplot(aes(x=pctpoint_diff_1to2, fill=Twitter_Acc)) +
-  geom_histogram(color = "#000000", binwidth = 0.5) +
+  ggplot(aes(x=pct_diff_1to2, fill=Twitter_Acc)) +
+  geom_histogram(color="#000000", binwidth = 1) +
   scale_fill_manual(values=c("#4b6043", "#a3c585")) +
   xlab("%-Point Difference of 1st to 2nd Vote") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  xlim(-50, 50)
 
 # check distribution of 1st - 2nd votes - boxplot
 df_master %>%
   mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
-  ggplot(aes(y=pctpoint_diff_1to2, x=Twitter_Acc)) +
+  ggplot(aes(y=pct_diff_1to2, x=Twitter_Acc)) +
   geom_boxplot(color = "#000000") +
   scale_fill_manual(values=c("#4b6043", "#a3c585")) +
   xlab("Twitter Account") +
@@ -511,6 +627,8 @@ df_master %>%
   ylab("Frequency") +
   labs(fill="Legend") +
   scale_fill_manual(values=c("#4b6043", "#a3c585"))
+
+ggsave("Graphs/Master/Incumbent_treatment.png", dpi=300)
 
 # check distribution of location (states)
 df_master %>%
@@ -536,6 +654,25 @@ df_master %>%
   ylab("Frequency") +
   labs(fill="Legend") +
   scale_fill_manual(values=c("#4b6043", "#a3c585"))
+
+ggsave("Graphs/Master/Gender_treatment.png", dpi=300)
+
+# Graph of vote outcome with/wo a Twitter account by party
+df_master %>%
+  mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
+  group_by(Twitter_Acc, party) %>%
+  summarise(Mean_Outcome = mean(percent_1, na.rm = TRUE)) %>%
+  arrange(desc(Mean_Outcome)) %>%
+  mutate(party = fct_inorder(as.factor(party))) %>%
+  ggplot(aes(x=party, y=Mean_Outcome, fill=Twitter_Acc)) +
+  geom_bar(stat="identity", position="dodge") +
+  xlab("Party") +
+  ylab("Average Vote Outcome") +
+  labs(fill="Legend") +
+  theme(text = element_text(family = "serif", size = 18)) +
+  scale_y_continuous(labels = function(x) {paste(x, "%")})
+
+ggsave("Graphs/Master/Vote_outcome_by_Twitter_party.png", dpi=300, width=9.5, height=7)
 
 # check distribution of birth year - histogram
 df_master %>% 
@@ -605,20 +742,21 @@ df_master %>%
 
 # check distribution of 1st - 2nd votes - histogram
 df_master %>%
-  select(pctpoint_diff_1to2, Twitter_act) %>%
+  select(pct_diff_1to2, Twitter_act) %>%
   drop_na() %>%
-  ggplot(aes(x=pctpoint_diff_1to2, fill=Twitter_act)) +
-  geom_histogram(color = "#000000", binwidth = 0.5) +
+  ggplot(aes(x=pct_diff_1to2, fill=Twitter_act)) +
+  geom_histogram(color = "#000000", binwidth = 1) +
   scale_fill_manual(values=c("#4b6043", "#87ab69", "#b3cf99")) +
   xlab("%-Point Difference of 1st to 2nd Vote") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  xlim(-50, 50)
 
 # check distribution of 1st - 2nd votes - boxplot
 df_master %>%
-  select(pctpoint_diff_1to2, Twitter_act) %>%
+  select(pct_diff_1to2, Twitter_act) %>%
   drop_na() %>%
-  ggplot(aes(y=pctpoint_diff_1to2, x=Twitter_act)) +
+  ggplot(aes(y=pct_diff_1to2, x=Twitter_act)) +
   geom_boxplot(color = "#000000") +
   xlab("Twitter Activity") +
   ylab("%-Point Difference of 1st to 2nd Vote")

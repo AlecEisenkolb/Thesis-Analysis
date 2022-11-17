@@ -1,5 +1,5 @@
 # GLES 2021 Study Visualizations
-# Date: 23.08.2022
+# Date: 13.09.2022
 # Author: Alec Eisenkolb
 
 # For this code to work, user must have previously run the Twitter API functions
@@ -50,28 +50,15 @@ ggthemr(theme2, layout = "clean", spacing = 1)
 # import data
 df_gles <- read_csv("Clean Data/GLES_2021.csv")
 
-# create tribble to transform party from numeric to string name (taken from labels from df_gles in Data Cleaning script)
-party_table <- tribble(
-  ~Number, ~Name,
-  1, "CDU",
-  2, "CDU",
-  3, "CSU",
-  4, "SPD",
-  5, "FDP",
-  6, "GRÜNE",
-  7, "DIE LINKE",
-  322, "AfD"
-)
-
 # Distribution of party alliance in this data
 df_gles %>%
-  mutate(partei = as.character(mgsub(partei, party_table$Number, party_table$Name))) %>%
-  group_by(partei) %>%
+  group_by(party) %>%
   summarise(n = n()) %>%
-  ggplot(aes(x=reorder(partei, -n), y=n)) +
+  ggplot(aes(x=reorder(party, -n), y=n)) +
   geom_bar(stat="identity") +
   xlab("Party") +
-  ylab("Observations")
+  ylab("Observations") +
+  theme(text = element_text(family = "serif"))
 
 # When did candidates begin their election campaign? Wahlkampfbeginn Frage b1
 df_gles %>% 
@@ -85,8 +72,11 @@ df_gles %>%
   scale_x_discrete(limit=c(1, 2, 3, 4, 5),
                    labels=c("> 6 Months", "3-6 Months", "1-3 Months", 
                             "< 1 Months", "Never")) +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  theme(text = element_text(family = "serif", size = 18))
   
+ggsave("Graphs/GLES/Begin_campaign.png", dpi=300)
+
 # How much time did candidates allocate to their campaign? Wahlkampf Zeitaufwand Frage b2
 # Note here that variable was often encoded in groups of 1-10, 11-20 etc... so note there are peaks here on the averages
 # as GESIS chose the average of the range whenever a range was given. 
@@ -120,13 +110,12 @@ df_gles %>%
 
 # by party
 df_gles %>%
-  mutate(partei = as.character(mgsub(partei, party_table$Number, party_table$Name))) %>%
-  group_by(partei) %>%
+  group_by(party) %>%
   summarise(`Avg Team Size` = mean(b3a, na.rm=TRUE)) %>%
             #Paid_mean = mean(b3b, na.rm=TRUE),
             #Volunt_mean = mean(b3c, na.rm=TRUE)) %>%
-  pivot_longer(!partei, names_to = "Team_Size", values_to = "Value") %>%
-  ggplot(aes(x=reorder(partei, -Value), y=Value, fill=Team_Size)) +
+  pivot_longer(!party, names_to = "Team_Size", values_to = "Value") %>%
+  ggplot(aes(x=reorder(party, -Value), y=Value, fill=Team_Size)) +
   geom_bar(position="stack", stat="identity") +
   labs(fill="Legend") +
   xlab("Party") +
@@ -197,9 +186,12 @@ df_gles %>%
   ggplot(aes(x=reorder(Description, -Value), y=Value)) +
   geom_bar(stat = "identity") +
   #xlab("Campaign Activity") +
-  ylab("Measure of Importance") +
+  ylab("Importance") +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1),
-        axis.title.x = element_blank())
+        axis.title.x = element_blank(),
+        text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/GLES/Type_campaign.png", dpi=300)
 
 # How did you use social media? Soziale Medien Frage b8
 b8a <- df_gles %>%
@@ -280,16 +272,67 @@ b8h <- df_gles %>%
 plot_grid(b8a, b8b, b8c, b8e, b8f, b8h,
           nrow = 2, ncol = 3)
 
+ggsave("Graphs/GLES/Social_media_positive.png", dpi=300)
+
 # plot grid of the two negatively-phrased questions
 plot_grid(b8d, b8g, nrow = 1, ncol = 2)
 
+ggsave("Graphs/GLES/Social_media_negative.png", dpi=300)
+
+# graph the IV variable
+df_gles %>%
+  select(SM_preference, twitter_acc) %>%
+  drop_na() %>%
+  mutate(twitter_acc = if_else(twitter_acc==1, "Twitter", 
+                               if_else(twitter_acc==0, "No Twitter", as.character(NA)))) %>%
+  ggplot(aes(x=SM_preference, fill=twitter_acc)) +
+  geom_histogram(color="#000000", binwidth = 0.125) +
+  scale_fill_manual(values=c("#4b6043", "#a3c585")) +
+  xlab("Social Media Relevance") +
+  ylab("Frequency") +
+  xlim(1, 5) +
+  labs(fill="Legend")
+
+ggsave("Graphs/GLES/IV_variable.png", dpi=300, width=9.5, height=7)
+
+# plot balance/distribution of social media adoption variables
+df_gles %>%
+  select(Twitter_GLES, Facebook_acc, Youtube_acc, FB_TW_acc, Social_media_AND) %>%
+  rename(Twitter = Twitter_GLES, 
+         Facebook =Facebook_acc,
+         Youtube = Youtube_acc,
+         `FB & TW` = FB_TW_acc,
+         `Social Media` = Social_media_AND) %>%
+  pivot_longer(c(Twitter, Facebook, Youtube, `FB & TW`, `Social Media`)) %>%
+  group_by(name) %>%
+  mutate(name = factor(name, levels = c("Twitter", "Facebook", "Youtube", "FB & TW", "Social Media"))) %>%
+  summarise(Yes = sum(value==1, na.rm = TRUE),
+            No = sum(value==0, na.rm = TRUE)) %>%
+  gather( "category", "counts", -name) %>%
+  mutate(category = factor(category, levels = c("Yes","No"))) %>%
+  ggplot(aes(x=name, y=counts, fill=category)) +
+  geom_col(position="dodge") +
+  xlab("Platforms") +
+  ylab("Frequency") +
+  labs(fill="Legend") +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/GLES/Social_Media_Adoption.png", dpi=300, width=9.5, height=7)
 
 
-
-
-
-
-
-
-
+# Estimate percentages of social media adoption from graph above
+df_gles %>%
+  select(Twitter_GLES, Facebook_acc, Youtube_acc, FB_TW_acc, Social_media_AND) %>%
+  rename(Twitter = Twitter_GLES, 
+         Facebook = Facebook_acc,
+         Youtube = Youtube_acc,
+         `FB & TW` = FB_TW_acc,
+         `Social Media` = Social_media_AND) %>%
+  pivot_longer(c(Twitter, Facebook, Youtube, `FB & TW`, `Social Media`)) %>%
+  group_by(name) %>%
+  mutate(name = factor(name, levels = c("Twitter", "Facebook", "Youtube", "FB & TW", "Social Media"))) %>%
+  summarise(Yes = sum(value==1, na.rm = TRUE),
+            No = sum(value==0, na.rm = TRUE)) %>%
+  mutate(Yes_Perc = as.numeric(Yes/(Yes+No))*100,
+         No_Perc = as.numeric(No/(Yes+No))*100)
 

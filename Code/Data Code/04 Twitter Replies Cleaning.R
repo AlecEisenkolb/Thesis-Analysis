@@ -8,7 +8,8 @@ library(tidyverse)
 library(readr)
 
 # import replies dataframe
-df_replies <- read_csv(paste0(PATH, "replies.csv"), col_types = "ccccc")
+df_replies <- read_csv(paste0(PATH, "Twitter API/replies.csv"), col_types = "ccccc")
+df_retweets <- read_csv(paste0(PATH, "Twitter API/retweets.csv"))
 
 # check memory size of dataframe (1 million+ observations)
 object.size(df_replies)

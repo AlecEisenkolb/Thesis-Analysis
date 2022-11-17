@@ -88,12 +88,14 @@ forecast <- forecast %>%
          party = if_else(party == "CDUCSU" & (district_num >= 212 & district_num <= 257), "CSU", party), # select only bavarian districts and change encoding to CSU
          party = if_else(party == "CDUCSU" & !(district_num >= 212 & district_num <= 257), "CDU", party)) # the non-bavarian districts are encoded as CDU
 
-# import master_nontwitter.csv to merge the district forecast with remaining data
+# import master_nontwitter.csv and GLES data to merge the district forecast
 master_df <- read_csv("Clean Data/master_all_cand.csv")
+df_gles <- read_csv("Clean Data/GLES_2021.csv")
 
 # check party encodings are the same for both datasets
 unique(forecast$party)
 unique(master_df$party)
+unique(df_gles$party)
 
 # merge data with district-level prediction
 master_df <- master_df %>%
@@ -102,8 +104,13 @@ master_df <- master_df %>%
 # count NA entries for "prediction" variable in master dataframe which we just added
 colSums(is.na(master_df)) 
 
-# write master dataset
+# merge gles data with district-level predictions
+df_gles <- df_gles %>%
+  left_join(forecast, by = c("district_num", "party"))
+
+# write both master and gles dataset
 write_csv(master_df, "Clean Data/master_all_cand.csv")
+write_csv(df_gles, "Clean Data/GLES_2021.csv")
 
 # clean memory
-rm(master_df, forecast, parties, dist_pred)
+rm(master_df, forecast, parties, dist_pred, df_gles)

@@ -63,20 +63,20 @@ rm(bad_tweets, check)
 ### collection to ensure the interruptions did not cause any tweets to be missed.
 
 # import tweets by 4 specific user IDs - indices were 277, 556, 823 and 1075
-user_check <- read.csv(paste0(PATH, "tweet_check.csv"))
-dim(user_check)
-unique(user_check$User.ID)
+#user_check <- read.csv(paste0(PATH, "tweet_check.csv"))
+#dim(user_check)
+#unique(user_check$User.ID)
 
 ### tweets by these users were 149 in total.
 ### Only one of these users had tweets, three others did not tweet at all.
 
 # Cross-check with complete twitter dataset
-check <- df_tweets %>%
-  filter(User.ID == 409258073 | User.ID == 2288663038 | User.ID == 137036352 | 
-           User.ID == 738636568760553472)
+#check <- df_tweets %>%
+#  filter(User.ID == 409258073 | User.ID == 2288663038 | User.ID == 137036352 | 
+#           User.ID == 738636568760553472)
 
-dim(check)
-unique(check$User.ID)
+#dim(check)
+#unique(check$User.ID)
 
 ### Filtering for identical user IDs in the total Twitter dataset leads to the
 ### same results - hence I can conclude that the interruption in the Twitter API
@@ -84,7 +84,7 @@ unique(check$User.ID)
 ### by the API interruption. 
 
 # clean memory
-rm(check, user_check)
+#rm(check, user_check)
 
 # # # # # STEP 3: Change column names # # # # # 
 
@@ -115,7 +115,7 @@ write.csv(df_tweets, paste0(EXPORT_PATH, "twitter_clean.csv"), row.names = FALSE
 df_user_ids <- read_csv(paste0(IMPORT_PATH, "Twitter/twitter_ids.csv"), col_types = "cccc")
 
 ### TEMPORARY IMPORT OF CLEAN TWITTER DATASET ### REMOVE LATER!
-df_tweets <- read_csv("Clean Data/Twitter/twitter_clean.csv", col_types = "ccTccddddcccD")
+#df_tweets <- read_csv("Clean Data/Twitter/twitter_clean.csv", col_types = "ccTccddddcccD")
 
 # rename column such that it matches for merging
 df_user_ids <- df_user_ids %>%
