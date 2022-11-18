@@ -2,15 +2,16 @@
 # Date: 08.10.2022
 # Author: Alec Eisenkolb
 
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
 # import libraries
-library(tidyverse)
-library(betareg)
-library(margins)
-#install.packages("ivtools")
-library(ivtools)
-library(stargazer)
-#install.packages("ivreg")
-library(ivreg)
+pacman::p_load(tidyverse,
+               betareg,
+               margins,
+               ivtools,
+               stargazer,
+               ivreg)
 
 # import data
 df_gles <- read_csv("Clean Data/GLES_2021.csv")
@@ -49,9 +50,8 @@ summary(beta_gles_tw)
 margins(beta_gles_tw)
 
 ### Run similar regressions not only on the dummy of having a twitter account, but also on facebook and social media in general
-# create indicator whether candidates use various social media
 
-# Run beta regression model on Facebook dummy
+## Run beta regression model on Facebook dummy
 beta_fb <- betareg(formula = I(percent_election_erststimme/100) ~ Facebook_acc 
                    + geburtsjahr + geschlecht + Educ + Incumbent + IsListed + Prediction 
                    + partyCDU + partyCSU + partyDIELINKE + partyFDP + partyGRUENE + partySPD 
@@ -63,7 +63,7 @@ summary(beta_fb)
 # estimate marginal effects
 margins(beta_fb)
 
-# Run beta regression model on Youtube dummy
+## Run beta regression model on YouTube dummy
 beta_yt <- betareg(formula = I(percent_election_erststimme/100) ~ Youtube_acc 
                    + geburtsjahr + geschlecht + Educ + Incumbent + IsListed + Prediction 
                    + partyCDU + partyCSU + partyDIELINKE + partyFDP + partyGRUENE + partySPD 
@@ -75,7 +75,7 @@ summary(beta_yt)
 # estimate marginal effects
 margins(beta_yt)
 
-# Run beta regression model on Facebook/Twitter dummy
+## Run beta regression model on Facebook/Twitter dummy
 beta_fb_tw <- betareg(formula = I(percent_election_erststimme/100) ~ FB_TW_acc 
                      + geburtsjahr + geschlecht + Educ + Incumbent + IsListed + Prediction 
                      + partyCDU + partyCSU + partyDIELINKE + partyFDP + partyGRUENE + partySPD 
@@ -87,7 +87,7 @@ summary(beta_fb_tw)
 # estimate marginal effects
 margins(beta_fb_tw)
 
-# Run beta regression model on Social Media dummy
+## Run beta regression model on Social Media dummy
 beta_sm <- betareg(formula = I(percent_election_erststimme/100) ~ Social_media_AND 
                    + geburtsjahr + geschlecht + Educ + Incumbent + IsListed + Prediction 
                    + partyCDU + partyCSU + partyDIELINKE + partyFDP + partyGRUENE + partySPD 
@@ -105,14 +105,7 @@ stargazer(beta_gles, beta_gles_tw, beta_fb, beta_yt, beta_fb_tw, beta_sm,
           type="latex",
           single.row=FALSE)
 
-
-
-
-
-
-
-
-
+### Part below not used in Thesis
 
 # # # # # IV Regression Analysis # # # # #
 

@@ -2,13 +2,14 @@
 # Date: 22.08.2022
 # Author: Alec Eisenkolb
 
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
 # import libraries
-library(Hmisc)
-library(tidyverse)
-# install.packages("haven")
-library(haven)
-# install.packages("fauxnaif")
-library(fauxnaif)
+pacman::p_load(Hmisc,
+               tidyverse,
+               haven,
+               fauxnaif)
 
 # set path for raw data
 PATH <- "Raw Data/"
@@ -17,8 +18,6 @@ PATH <- "Raw Data/"
 ### This dataset includes information on the district election results for 2021
 ### and 2017 federal elections, including percent and absolute votes for 
 ### Erststimme (direct candidates) and Zweitstimme (party vote) per district. 
-
-### Citation:
 
 # path and import
 DTA_Elec <- "btw21 ergebniss/BWL_Endgültig.csv"
@@ -56,8 +55,6 @@ sapply(election_df, class)
 ##### --------------------- import candidacy dataset --------------------- #####
 ### This dataset includes information on all political candidates for the 
 ### German parliament in Germany's 2021 federal election.
-
-### Citation: 
 
 # path and import
 DTA_Cand <- "btw21_kandidaturen_utf8.csv"
@@ -108,8 +105,6 @@ sapply(candidate_df, class)
 
 ##### --------------------- import structural dataset -------------------- #####
 ### This dataset includes all structural data per political district.
-
-### Citation: 
 
 # path and import
 DTA_Struc <- "btw21_strukturdaten.csv"
@@ -187,8 +182,6 @@ cor(structural_df$district_avg_income, structural_df$district_unemprate_total)
 ### This data contains a list of all twitter accounts with their respective IDs
 ### alongside other variables and demographics
 
-### Citation: 
-
 # path and import
 DTA_twitter <- "Twitter IDs/twitter_ids.csv"
 twitterid_df <- read.csv(paste0(PATH, DTA_twitter), sep = ";", header = TRUE, 
@@ -234,14 +227,16 @@ check %>%
   filter(!(incumbent.x == incumbent.y)) %>%
   view()
 
-### No observations seem to have a mismatch regarding these variables, hence it is not important which one we keep
+### No observations seem to have a mismatch regarding these variables, 
+### hence it is not important which one we keep
 
 # Check variable state
 check %>%
   select(state.x, state.y) %>%
   view()
 
-### Both variables are identical, but one is the abbreviation of the state and the other is its full name, we keep both in case and rename these accordingly
+### Both variables are identical, but one is the abbreviation of the state and 
+### the other is its full name, we keep both in case and rename these accordingly
 
 # Check variable district
 check %>%
@@ -257,9 +252,11 @@ structural_df %>%
   filter(district == "Paderborn" | district == "Höxter – Gütersloh III – Lippe II") %>%
   select(district_num, district)
 
-### The two districts which seem to have an inconsistency are districts 136 and 137. Further google searches led to the results,
-### that the official website from the "Bundeswahlleiter" (https://www.bundeswahlleiter.de/bundestagswahlen/2021/wahlkreiseinteilung/bund-99/land-5/wahlkreis-136.html) 
-### defines the election districts according to the variable "district.y". Hence we will keep this variable as it follows the official district organisation.
+### The two districts which seem to have an inconsistency are districts 136 and 137. 
+### Further google searches led to the results, that the official website from the 
+### "Bundeswahlleiter" (https://www.bundeswahlleiter.de/bundestagswahlen/2021/wahlkreiseinteilung/bund-99/land-5/wahlkreis-136.html) 
+### defines the election districts according to the variable "district.y". 
+### Hence we will keep this variable as it follows the official district organisation.
 
 # Remove and rename the above variables from the master dataset
 master_df <- master_df %>%
@@ -396,7 +393,7 @@ test %>%
   filter(is.na(Twitter_Acc)) %>%
   view()
 
-##### --------------------------- Export datasets ------------------------ #####
+##### --------------------------- export datasets ------------------------ #####
 
 # Save data as CSV file - master_all_cand is the master dataframe including all direct candidates, irrespective of having a twitter account
 write_csv(master_df, "Clean Data/master_all_cand.csv")
@@ -414,7 +411,7 @@ write_csv(master_twitter_only, "Clean Data/master_twitter_cand.csv")
 ### dataset. Twitter ID dataset only includes candidates of largest parties: SPD, CDU, 
 ### FDP, GRÜNE, DIE LINKE and AfD. 
 
-##### --------------------------- Twitter ID Data ------------------------ #####
+##### --------------------------- twitter ID Data ------------------------ #####
 # # # # # Prepare a seperate dataset for Twitter scraping # # # # #
 twitter_ID1 <- master_twitter_only %>%
   select(lastname, firstname, screen_name1, user_id1) %>%
@@ -439,7 +436,7 @@ write_csv(twitter_api, "Clean Data/Twitter/twitter_ids.csv")
 ### candidates in a district and also have a twitter ID. In total we have 1215 
 ### twitter IDs which we will proceed to scrape using the Twitter API. 
 
-##### -------------------------- Shapefile Dataset ----------------------- #####
+##### -------------------------- shapefile dataset ----------------------- #####
 # # # # # Cleaning shapefile of election districts # # # # #
 # import specific libraries for GIS data
 library(plyr)
@@ -461,7 +458,7 @@ shapefiles <- join(shp_df, district_shp@data, by="id")
 # save data
 write_csv(shapefiles, "Clean Data/District_shapefiles.csv")
 
-#####------------------- GLES 2021 Election Study Data ------------------- #####
+#####------------------- gles 2021 election study data ------------------- #####
 
 # import merged GLES data
 df_gles <- read_dta("Raw Data/GLES 2021/ZA7704_v1-0-0_merge.dta")

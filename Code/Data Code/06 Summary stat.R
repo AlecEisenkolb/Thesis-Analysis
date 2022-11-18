@@ -2,9 +2,12 @@
 # Date: 06.07.2022
 # Author: Alec Eisenkolb
 
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
 # import libraries
-library(tidyverse)
-library(stargazer)
+pacman::p_load(tidyverse,
+               stargazer)
 
 # import data
 df_master <- read_csv("Clean Data/master_all_cand.csv")
@@ -106,7 +109,9 @@ vars <- c("birth_year", "gender", "incumbent", "isListed", "East_Germany",
 # potentially other vars to include: "district_age_young", "district_educ_general_total_grads_per1000"
 # create empty dataframe table to store p-values in
 test_table <- data.frame(matrix(NA, nrow=8, ncol=7))
-colnames(test_table) <- c("Variable", "Mean Twitter", "Median Twitter", "Mean No Twitter", "Median No Twitter", "T-Test Unpaired", "Wilcoxon-Test Unpaired")
+colnames(test_table) <- c("Variable", "Mean Twitter", "Median Twitter", 
+                          "Mean No Twitter", "Median No Twitter", 
+                          "T-Test Unpaired", "Wilcoxon-Test Unpaired")
 
 # set counter
 i <- 1

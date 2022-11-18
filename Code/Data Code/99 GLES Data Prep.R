@@ -1,9 +1,13 @@
-### Script to anonymise data from GLES and merge with Twitter data
+# Script to anonymise data from GLES and merge with Twitter data
 # Author: Alec Eisenkolb
 # Date: 28.07.2022
 
-library(tidyverse)
-library(readxl)
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
+# import libraries
+pacman::p_load(tidyverse,
+               readxl)
 
 df_master <- read_csv("Clean Data/master_all_cand.csv")
 

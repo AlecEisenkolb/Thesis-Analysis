@@ -8,18 +8,17 @@
 # by the GESIS Institute for data privacy purposes, which cannot be replicated by 
 # code available in this project but was done externally. 
 
-# install.packages("sjlabelled")
-# install.packages("gridExtra")
-# install.packages("cowplot")
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
 
-# load libraries
-library(tidyverse)
-library(ggplot2)
-library(ggthemr)
-library(sjlabelled)
-library(mgsub)
-library(gridExtra)
-library(cowplot)
+# import libraries
+pacman::p_load(tidyverse,
+               ggplot2,
+               ggthemr,
+               sjlabelled,
+               mgsub,
+               gridExtra,
+               cowplot)
 
 # set graph colour theme
 # define colour palette
@@ -279,7 +278,7 @@ plot_grid(b8d, b8g, nrow = 1, ncol = 2)
 
 ggsave("Graphs/GLES/Social_media_negative.png", dpi=300)
 
-# graph the IV variable
+# graph the social media preference variable
 df_gles %>%
   select(SM_preference, twitter_acc) %>%
   drop_na() %>%

@@ -2,26 +2,23 @@
 # Date: 14.10.2022
 # Author: Alec Eisenkolb
 
-# import libraries
-library(tidyverse)
-library(lmtest)
-library(sandwich)
-#install.packages("betareg")
-library(betareg)
-#install.packages("margins")
-library(margins)
-#install.packages("stargazer")
-library(stargazer)
-library(ggthemr)
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
 
-library(broom)
-library(coefplot)
-library(ggeffects)
-#install.packages("effects")
-library(effects)
-#install.packages("GGally")
-library(GGally)
-require(mgsub)
+# import libraries
+pacman::p_load(tidyverse,
+               lmtest,
+               sandwich,
+               betareg,
+               margins,
+               stargazer,
+               ggthemr,
+               broom,
+               coefplot,
+               ggeffects,
+               effects,
+               GGally,
+               mgsub)
 
 # define second colour scheme (used for line graphs for better contrast between groups)
 colourful_palette <- c("#658354", "#b3cf99", "#47697E", "#688B9A", "#FFCC33", "#FEEB75")
@@ -86,8 +83,8 @@ robust.se.OLS3 <- sqrt(diag(vcovHC(OLS_3, type = "HC0")))
 ### OLS 4: add further control variables (structural) - district indicators and East-Germany dummy
 OLS_4 <- lm(I(percent_1/100) ~ Twitter_Acc + birth_year + gender + job_key + incumbent 
             + isListed + Prediction + party + Top_candidate 
-            + I(log(district_avg_income)) + 
-            + district_pop_foreign + district_age_60over + East_Germany, data = df_master) 
+            + I(log(district_avg_income)) + district_pop_foreign 
+            + district_age_60over + East_Germany, data = df_master) 
 # extract coefficients
 summary(OLS_4)
 # extract corefficients with robust standard errors
@@ -141,10 +138,12 @@ stargazer(OLS_1, OLS_2, OLS_3, OLS_4, se=list(robust.se.OLS1, robust.se.OLS2,
                                               robust.se.OLS3, robust.se.OLS4),
           type="latex", single.row=FALSE)
 
-### BETA REGRESSION MODELS ###
+# # # # # BETA Regression Models # # # # #
 
-## Run a beta-regression model to alleviate the issues of heteroscedasticity and asymmetries we experience in the data
-## Additionally useful to model a proportional dependent variable (percentage of first-past-the-post vote)
+### Run a beta-regression model to alleviate the issues of heteroscedasticity and 
+### asymmetries we experience in the data
+### Additionally useful to model a proportional dependent variable (percentage of first-past-the-post vote)
+
 ## Beta 1: Simple model specification with demographic control variables
 beta_1 <- betareg(formula = I(percent_1/100) ~ Twitter_Acc + birth_year + gender 
                   + job_key, data=df_master)
@@ -170,13 +169,15 @@ summary(beta_3)
 # where beta_3 is the full model, and beta_2 & beta_1 are two different nested models within the full model. 
 lrtest(beta_3, beta_2, beta_1)
 
-# Result: test statistic for both models are well below 0.05, hence we reject H0 and conclude that full model provides best overall fit. 
+### Result: test statistic for both models are well below 0.05, 
+### hence we reject H0 and conclude that full model provides best overall fit. 
 
 # Run a BIC (Bayes-Information-Criterion) for model selection, closely related to the AIC
 AIC(beta_3, beta_2, beta_1, k=log(nrow(df_master)-4)) # subtract 4 from total observations as 4 obvs deleted in regression due to NAs
 
-# Result: beta_3 (full model) and beta_2 have similar low BIC, with beta_2 performing slightly better. As these are very similar, 
-# decide to continue with full model given lrtest showed beta_3 was the better overall fit. 
+## Result: beta_3 (full model) and beta_2 have similar low BIC, with beta_2 
+## performing slightly better. As these are very similar, 
+## decide to continue with full model given lrtest showed beta_3 was the better overall fit. 
 
 # Report the marginal effects of the three beta regressions above, to more easily interpret the coefficient estimates
 margins(beta_1)
@@ -191,8 +192,8 @@ stargazer(beta_1, beta_2, beta_3, type="latex", single.row=FALSE)
 sapply(c("logit", "probit", "loglog", "cloglog", "cauchit"),
        function(x) {logLik(update(beta_3, link = x))})
 
-# Result: as the log-likelihood of both the probit and log-log link functions outperform the logit link function,
-# we run the full model on these respective link functions and compute the coefficients and marginal effects.
+### Result: as the log-likelihood of both the probit and log-log link functions outperform the logit link function,
+### we run the full model on these respective link functions and compute the coefficients and marginal effects.
 
 # Beta Regression model using a Probit link function:
 beta_probit <- update(beta_3, link = "probit")
@@ -211,7 +212,7 @@ margins(beta_loglog)
 # Result: running a beta regression using the probit and log-log link functions
 # show no major differences in the magnitude and significance level of the independent variable.
 
-### OLS AND BETA WITH PARTY INTERACTION EFFECTS ###
+# # # # # OLS and BETA with party interaction effects # # # # #
 
 OLS_interact <- lm(I(percent_1/100) ~ Twitter_Acc + birth_year + gender + job_key + incumbent 
                    + isListed + Prediction + Top_candidate 
@@ -262,7 +263,6 @@ beta_tidy <- tidy(beta_interact, conf.int = TRUE) %>%
   mutate(term = as.character(mgsub(term, c("LEF", "GRE"), c("The Left", "The Greens"))))
 
 # Plot the coefficient estimates of both OLS and Beta interaction variables
-
 ggcoef(ols_tidy) +
   ylab("Interaction Variable") +
   xlab("Coefficient Estimate") +
@@ -277,7 +277,7 @@ ggcoef(beta_tidy) +
 
 ggsave("Graphs/Master/BETA_Interaction.png", dpi=300, width=9.5, height=7)
 
-### MODELS WITH TWITTER ACTIVITY INDEPENDENT VARS ###
+# # # # # Models with Twitter activity as independent variables # # # # #
 
 # only select candidates who have a twitter account
 df_twitter <- df_master %>%
@@ -355,7 +355,7 @@ margins(beta_rt)
 stargazer(beta_avgpost, beta_hotphase, beta_postdiff, beta_likes, beta_reply, beta_rt,
           type="latex", single.row=FALSE)
 
-### OTHER MODELS ###
+# # # # # Other Models # # # # #
 
 ### Test full model on other dependent variables
 ## Dependent variable: dummy variable on whether candidate won seat
@@ -380,7 +380,7 @@ summary(OLS_pctdiff)
 coeftest(OLS_pctdiff, vcov = vcovHC(OLS_pctdiff, type = "HC0"))
 robust.se.OLSpctdiff <- sqrt(diag(vcovHC(OLS_pctdiff, type = "HC0")))
 
-# run same regression as above, but without party affiliation
+## Run same regression as above, but without party affiliation
 OLS_pctdiff_wo_party <- lm(pct_diff_1to2 ~ Twitter_Acc + birth_year + gender + job_key 
                   + incumbent + isListed + Prediction + Top_candidate
                   + log(district_avg_income) + district_age_60over 
@@ -392,7 +392,7 @@ coeftest(OLS_pctdiff_wo_party, vcov = vcovHC(OLS_pctdiff_wo_party, type = "HC0")
 robust.se.OLSpctdiff_wo_party <- sqrt(diag(vcovHC(OLS_pctdiff_wo_party, type = "HC0")))
 
 
-# create table of regression results above
+# create table of regression results above 
 stargazer(OLS_pctdiff, OLS_pctdiff_wo_party, se=list(robust.se.OLSpctdiff, robust.se.OLSpctdiff_wo_party), 
           type="latex", single.row = FALSE)
 

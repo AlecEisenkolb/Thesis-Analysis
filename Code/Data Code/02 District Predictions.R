@@ -8,14 +8,17 @@
 ### Lukas F. Stoetzer (2022). “The Zweitstimme Model: A Dynamic Forecast of the 
 ### 2021 German Federal Election.” PS: Political Science & Politics 55(1): 85–90
 
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
 # import libraries
-library(tidyverse)
-library(readr)
+pacman::p_load(tidyverse,
+               readr)
 
 # set path for raw data
 PATH <- "Raw Data/"
 
-# path and import
+# path and import district predictions
 dist_pred <- readRDS(paste0(PATH, "Wkr Forecast/2021_wkr.RDS"))
 
 # create empty dataframe to store results in

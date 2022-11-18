@@ -6,19 +6,20 @@
 # "01 Data Cleaning.R", "02 District Predictions.R", "03 Twitter Cleaning.R" &
 # "04 Twitter Replies Cleaning.R", as well as the python code to scrape the Twitter data "Twitter API.py". 
 
-# install libraries, uncomment below if necessary
-# install.packages("devtools")
-# devtools::install_github("cttobin/ggthemr")
 # install.packages("maptools") # required for spatial visual analysis
 
-# load libraries
-library(tidyverse)
-library(ggplot2)
-library(ggridges)
-library(devtools)
-library(ggthemr)
-library(forcats)
-library(zoo)
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
+# import libraries
+pacman::p_load(tidyverse,
+               ggplot2,
+               ggridges,
+               devtools,
+               ggthemr,
+               forcats,
+               zoo,
+               scales)
 
 # define colour palette
 green_palette <- c("#4b6043", "#658354", "#75975e", "#87ab69", "#95bb72", "#a3c585",
@@ -43,7 +44,7 @@ theme2 <- define_palette(
   gradient = c(lower = colourful_palette[1L], upper = colourful_palette[2L]),
   background = '#ffffff'
 )
-library(scales)
+
 show_col(colourful_palette)
 show_col(green_palette)
 
@@ -408,6 +409,9 @@ df_twitter %>%
   group_by(Day) %>%
   summarise(count = n()) %>%
   mutate(Mov_Avg = zoo::rollmean(count, k = 7, fill = NA)) %>%
+  view()
+
+
   ggplot(aes(x=Day)) +
   geom_line(aes(y=count, colour = "Total postings")) +
   geom_line(aes(y=Mov_Avg, color = "7-Day moving average")) +
@@ -593,18 +597,24 @@ df_master %>%
   geom_boxplot(color = "#000000") +
   scale_fill_manual(values=c("#4b6043", "#a3c585")) +
   xlab("Twitter Account") +
-  ylab("Percentage Vote for Direct Candidates")
+  ylab("Percentage Vote for Direct Candidates") +
+  theme(text = element_text(family = "serif", size = 18))
 
 # check distribution of 1st - 2nd votes - histogram
 df_master %>%
+  filter(pct_diff_1to2 < 100 & pct_diff_1to2 > -100) %>%
   mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
   ggplot(aes(x=pct_diff_1to2, fill=Twitter_Acc)) +
-  geom_histogram(color="#000000", binwidth = 1) +
-  scale_fill_manual(values=c("#4b6043", "#a3c585")) +
+  geom_histogram(color="#000000", binwidth = 2) +
+  #scale_fill_manual(values=c("#4b6043", "#a3c585")) +
   xlab("%-Point Difference of 1st to 2nd Vote") +
   ylab("Frequency") +
   labs(fill="Legend") +
-  xlim(-50, 50)
+  scale_x_continuous(labels = function(x) {paste(x, "%")},
+                     breaks = pretty_breaks(n=6)) +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/1_to_2_pct_by_TW.png", dpi=300, width=9.5, height=7)
 
 # check distribution of 1st - 2nd votes - boxplot
 df_master %>%
@@ -626,7 +636,8 @@ df_master %>%
   xlab("Incumbent") + 
   ylab("Frequency") +
   labs(fill="Legend") +
-  scale_fill_manual(values=c("#4b6043", "#a3c585"))
+  #scale_fill_manual(values=c("#4b6043", "#a3c585")) +
+  theme(text = element_text(family = "serif", size = 18))
 
 ggsave("Graphs/Master/Incumbent_treatment.png", dpi=300)
 
@@ -653,7 +664,8 @@ df_master %>%
   xlab("Twitter Account") +
   ylab("Frequency") +
   labs(fill="Legend") +
-  scale_fill_manual(values=c("#4b6043", "#a3c585"))
+  #scale_fill_manual(values=c("#4b6043", "#a3c585")) +
+  theme(text = element_text(family = "serif", size = 18))
 
 ggsave("Graphs/Master/Gender_treatment.png", dpi=300)
 
@@ -679,11 +691,14 @@ df_master %>%
   mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
   ggplot(aes(x=birth_year, fill=Twitter_Acc)) +
   geom_histogram(colour="#000000", binwidth=2) +
-  scale_fill_manual(values = c("#4b6043", "#a3c585")) +
+  #scale_fill_manual(values = c("#4b6043", "#a3c585")) +
   xlab("Year of Birth") +
   ylab("Frequency") +
-  labs(fill="Legend")
+  labs(fill="Legend") +
+  theme(text = element_text(family = "serif", size = 18))
   
+ggsave("Graphs/Master/Birth_year_treament.png", dpi=300, width=9.5, height=7)
+
 # check distribution of birth year - boxplot
 df_master %>% 
   mutate(Twitter_Acc = if_else(Twitter_Acc==0, "No Twitter", "Twitter")) %>%
@@ -741,6 +756,7 @@ df_master %>%
   ylab("Percentage Vote for Direct Candidates")
 
 # check distribution of 1st - 2nd votes - histogram
+
 df_master %>%
   select(pct_diff_1to2, Twitter_act) %>%
   drop_na() %>%
@@ -821,7 +837,28 @@ df_master %>%
 
 ##### Checking for common support between control and treatment group!
 
+# Compute propensity scores using logit model
+logit_model <- glm(formula = Twitter_Acc ~ birth_year + gender + job_key + incumbent 
+                   + isListed + Prediction + party + Top_candidate 
+                   + I(log(district_avg_income)) + district_pop_foreign 
+                   + district_age_60over + East_Germany, 
+                   family = binomial(),
+                   data = df_master)
 
+# compute propensity scores
+prop_df <- data.frame(Prop_Score = predict(logit_model, type = "response"),
+                      Twitter_Acc = logit_model$model$Twitter_Acc)
 
+# visualize propensity scores
+prop_df %>%
+  mutate(Twitter_Acc = if_else(Twitter_Acc == 1, "Twitter Account", "No Twitter Account")) %>%
+  ggplot(aes(x=Prop_Score, fill=Twitter_Acc)) +
+  geom_density(alpha=0.6) +
+  xlab("Propensity Score") +
+  ylab("Density") +
+  labs(fill="Legend") +
+  theme(text = element_text(family = "serif", size = 18))
+
+ggsave("Graphs/Master/Common_support.png", dpi=300, width=9.5, height=7)
 
 

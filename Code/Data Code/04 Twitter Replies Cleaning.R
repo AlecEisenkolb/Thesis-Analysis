@@ -3,9 +3,14 @@
 # Date: 16.06.2022
 # Author: Alec Eisenkolb
 
+# Not used in Thesis
+
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
 # import libraries
-library(tidyverse)
-library(readr)
+pacman::p_load(tidyverse,
+               readr)
 
 # import replies dataframe
 df_replies <- read_csv(paste0(PATH, "Twitter API/replies.csv"), col_types = "ccccc")

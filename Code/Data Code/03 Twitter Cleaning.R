@@ -1,15 +1,18 @@
 # Twitter Data Preparation 
-# MAIN TWEETS by Candidates
+# Main Tweets by Candidates
 # Date: 19.06.2022
 # Author: Alec Eisenkolb
 
 # For this code to work, user must have previously ran the Twitter API function
 # to scrape main tweets of candidates "Twitter API.py".
 
+# install package pacman to access function p_load to load and install packages
+if (!require("pacman")) install.packages("pacman")
+
 # import libraries
-library(tidyverse)
-library(readr)
-library(stringr)
+pacman::p_load(tidyverse,
+               readr,
+               stringr)
 
 # set path for raw data
 PATH <- "Raw Data/Twitter API/"
@@ -95,7 +98,7 @@ colnames(df_tweets) <- str_replace_all(colnames(df_tweets), "[:punct:]", " ")
 df_tweets <- df_tweets %>%
   select(-`X`)
 
-# # # # # STEP 3: Further data manipulation # # # # #
+# # # # # STEP 4: Further data manipulation # # # # #
 
 # create Day variable from datetime and convert IDs to strings
 df_tweets <- df_tweets %>%
@@ -113,9 +116,6 @@ write.csv(df_tweets, paste0(EXPORT_PATH, "twitter_clean.csv"), row.names = FALSE
 # import dataframe with candidate names and Twitter User IDs 
 # NOTE: merging by user ID is not possible as some candidates have multiple twitter accounts
 df_user_ids <- read_csv(paste0(IMPORT_PATH, "Twitter/twitter_ids.csv"), col_types = "cccc")
-
-### TEMPORARY IMPORT OF CLEAN TWITTER DATASET ### REMOVE LATER!
-#df_tweets <- read_csv("Clean Data/Twitter/twitter_clean.csv", col_types = "ccTccddddcccD")
 
 # rename column such that it matches for merging
 df_user_ids <- df_user_ids %>%
